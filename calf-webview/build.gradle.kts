@@ -3,6 +3,7 @@ import org.gradle.internal.os.OperatingSystem
 plugins {
     id("compose.multiplatform")
     id("module.publication")
+    kotlin("plugin.serialization")
 }
 
 val os: OperatingSystem = OperatingSystem.current()
@@ -22,6 +23,7 @@ kotlin {
         implementation(compose.foundation)
         implementation(compose.material3)
         implementation(libs.kotlinx.coroutines.core)
+        implementation(libs.kotlinx.serialization.json)
     }
 
     sourceSets.androidMain.dependencies {

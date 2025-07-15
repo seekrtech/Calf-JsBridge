@@ -42,7 +42,6 @@ include(
     ":sample:android",
     ":sample:desktop",
     ":sample:web-js",
-    ":sample:web-wasm",
     ":sample:common",
 )
 

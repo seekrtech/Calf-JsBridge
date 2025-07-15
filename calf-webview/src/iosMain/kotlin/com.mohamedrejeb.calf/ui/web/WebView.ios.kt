@@ -51,6 +51,7 @@ actual fun WebView(
     modifier: Modifier,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
+    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
     onCreated: () -> Unit,
     onDispose: () -> Unit,
 ) {
@@ -100,6 +101,15 @@ actual fun WebView(
                 onCreated()
                 setUserInteractionEnabled(captureBackPresses)
                 applySettings(state.settings)
+                
+                // Setup JavaScript bridge if provided
+                webViewJsBridge?.let { bridge ->
+                    val iosHandler = com.mohamedrejeb.calf.ui.web.jsbridge.IOSJsBridgeHandler(bridge)
+                    configuration.userContentController.addScriptMessageHandler(iosHandler, "iosJsBridge")
+                    bridge.webViewState = state
+                    state.webViewJsBridge = bridge
+                }
+                
                 state.webView = this
                 navigationDelegate = state
             }
@@ -123,6 +133,8 @@ actual fun WebView(
 actual class WebViewState actual constructor(
     webContent: WebContent
 ): NSObject(), WKNavigationDelegateProtocol {
+    
+    internal var webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null
     actual var lastLoadedUrl: String? by mutableStateOf(null)
         internal set
 
@@ -179,6 +191,20 @@ actual class WebViewState actual constructor(
     @ObjCSignatureOverride
     override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
         loadingState = LoadingState.Finished
+        
+        // Inject JavaScript bridge when page is finished loading
+        webViewJsBridge?.let { bridge ->
+            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(this, bridge)
+            
+            // Inject iOS-specific bridge connection
+            val iosScript = """
+                window.${bridge.jsBridgeName}.postMessage = function (message) {
+                    window.webkit.messageHandlers.iosJsBridge.postMessage(message);
+                };
+            """.trimIndent()
+            
+            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(this, bridge, iosScript)
+        }
     }
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")

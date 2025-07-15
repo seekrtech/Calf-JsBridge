@@ -63,6 +63,7 @@ actual fun WebView(
     modifier: Modifier,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
+    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
     onCreated: () -> Unit,
     onDispose: () -> Unit,
 ) {
@@ -95,6 +96,7 @@ actual fun WebView(
             Modifier,
             captureBackPresses,
             navigator,
+            webViewJsBridge,
             {
                 it.settings.standardFontFamily = "sans-serif"
                 it.settings.defaultFontSize = 16
@@ -158,6 +160,7 @@ internal fun WebView(
     modifier: Modifier = Modifier,
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
+    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
     onCreated: (WebView) -> Unit = {},
     onDispose: (WebView) -> Unit = {},
     client: AccompanistWebViewClient = remember { AccompanistWebViewClient() },
@@ -207,9 +210,10 @@ internal fun WebView(
     // parent Web composable
     client.state = state
     client.navigator = navigator
+    client.webViewJsBridge = webViewJsBridge
     chromeClient.state = state
 
-    AndroidView(
+            AndroidView(
         factory = { context ->
             (factory?.invoke(context) ?: WebView(context)).apply {
                 onCreated(this)
@@ -220,6 +224,12 @@ internal fun WebView(
 
                 state.viewState?.let {
                     this.restoreState(it)
+                }
+
+                // Setup JavaScript bridge if provided
+                webViewJsBridge?.let { bridge ->
+                    val androidInterface = com.mohamedrejeb.calf.ui.web.jsbridge.AndroidJsBridgeInterface(bridge)
+                    addJavascriptInterface(androidInterface, "androidJsBridge")
                 }
 
                 webChromeClient = chromeClient
@@ -276,6 +286,8 @@ public open class AccompanistWebViewClient : WebViewClient() {
         internal set
     public open lateinit var navigator: WebViewNavigator
         internal set
+    public open var webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null
+        internal set
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
@@ -290,6 +302,20 @@ public open class AccompanistWebViewClient : WebViewClient() {
     override fun onPageFinished(view: WebView, url: String?) {
         super.onPageFinished(view, url)
         state.loadingState = LoadingState.Finished
+        
+        // Inject JavaScript bridge when page is finished loading
+        webViewJsBridge?.let { bridge ->
+            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(state, bridge)
+            
+            // Inject Android-specific bridge connection
+            val androidScript = """
+                window.${bridge.jsBridgeName}.postMessage = function (message) {
+                    window.androidJsBridge.call(message);
+                };
+            """.trimIndent()
+            
+            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(state, bridge, androidScript)
+        }
     }
 
     override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {

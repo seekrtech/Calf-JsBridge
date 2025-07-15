@@ -41,6 +41,7 @@ expect fun WebView(
     modifier: Modifier = Modifier,
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
+    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
     onCreated: () -> Unit = {},
     onDispose: () -> Unit = {},
 )
