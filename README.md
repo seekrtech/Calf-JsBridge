@@ -1,3 +1,6 @@
+This is a modified version of [Calf](https://github.com/MohamedRejeb/Calf), originally developed by Mohamed Rejeb.
+Changes have been made to add JSBridge support. Distributed under the terms of the Apache License 2.0.
+
 # Calf - Compose Adaptive Look & Feel
 
 Calf is a library that allows you to easily create adaptive UIs and access platform specific APIs from your Compose Multiplatform apps.
