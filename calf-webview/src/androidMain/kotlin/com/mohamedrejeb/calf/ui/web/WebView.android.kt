@@ -32,6 +32,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
+actual typealias PlatformWebView = WebView
+
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
  *
@@ -64,8 +66,8 @@ actual fun WebView(
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
-    onCreated: () -> Unit,
-    onDispose: () -> Unit,
+    onCreated: (PlatformWebView) -> Unit,
+    onDispose: (PlatformWebView) -> Unit,
 ) {
     val client = remember { AccompanistWebViewClient() }
     val chromeClient = remember { AccompanistWebChromeClient() }
@@ -119,8 +121,8 @@ actual fun WebView(
                 it.settings.builtInZoomControls = true
                 it.settings.displayZoomControls = false
                 it.settings.setGeolocationEnabled(true)
-                onCreated() },
-            { onDispose() },
+                onCreated(it) },
+            { onDispose(it) },
             client,
             chromeClient,
             null
@@ -213,7 +215,7 @@ internal fun WebView(
     client.webViewJsBridge = webViewJsBridge
     chromeClient.state = state
 
-            AndroidView(
+    AndroidView(
         factory = { context ->
             (factory?.invoke(context) ?: WebView(context)).apply {
                 onCreated(this)

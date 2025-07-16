@@ -14,6 +14,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 
+expect class PlatformWebView
+
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
  *
@@ -42,8 +44,8 @@ expect fun WebView(
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
-    onCreated: () -> Unit = {},
-    onDispose: () -> Unit = {},
+    onCreated: (PlatformWebView) -> Unit = {},
+    onDispose: (PlatformWebView) -> Unit = {},
 )
 
 public sealed class WebContent {

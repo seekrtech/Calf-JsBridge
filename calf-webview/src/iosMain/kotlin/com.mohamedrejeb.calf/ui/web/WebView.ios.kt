@@ -23,6 +23,8 @@ import platform.Foundation.NSUTF8StringEncoding
 import platform.WebKit.*
 import platform.darwin.NSObject
 
+actual typealias PlatformWebView = WKWebView
+
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
  *
@@ -52,8 +54,8 @@ actual fun WebView(
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
-    onCreated: () -> Unit,
-    onDispose: () -> Unit,
+    onCreated: (PlatformWebView) -> Unit,
+    onDispose: (PlatformWebView) -> Unit,
 ) {
     val webView = state.webView
 
@@ -98,7 +100,6 @@ actual fun WebView(
     UIKitView(
         factory = {
             WKWebView().apply {
-                onCreated()
                 setUserInteractionEnabled(captureBackPresses)
                 applySettings(state.settings)
                 
@@ -112,13 +113,15 @@ actual fun WebView(
                 
                 state.webView = this
                 navigationDelegate = state
+
+                onCreated(this)
             }
         },
         properties = UIKitInteropProperties(
             interactionMode = UIKitInteropInteractionMode.NonCooperative,
         ),
         onRelease = {
-            onDispose()
+            onDispose(it)
             state.webView = null
         },
         modifier = modifier,
