@@ -47,5 +47,5 @@ open class WebViewJsBridge(
  * Create a [WebViewJsBridge] that is remembered across Compositions.
  */
 @Composable
-fun rememberWebViewJsBridge(navigator: WebViewNavigator? = null): WebViewJsBridge = 
-    remember { WebViewJsBridge(navigator) } 
+fun rememberWebViewJsBridge(navigator: WebViewNavigator? = null, jsBridgeName: String = "calfJsBridge"): WebViewJsBridge =
+    remember { WebViewJsBridge(navigator, jsBridgeName) }

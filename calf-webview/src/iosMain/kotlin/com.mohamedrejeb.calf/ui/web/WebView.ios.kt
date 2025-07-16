@@ -100,7 +100,12 @@ actual fun WebView(
     UIKitView(
         factory = {
             WKWebView().apply {
-                setUserInteractionEnabled(captureBackPresses)
+                // Enable user interaction for touch events
+                setUserInteractionEnabled(true)
+                
+                // Configure back/forward gesture handling separately
+                allowsBackForwardNavigationGestures = captureBackPresses
+
                 applySettings(state.settings)
                 
                 // Setup JavaScript bridge if provided
