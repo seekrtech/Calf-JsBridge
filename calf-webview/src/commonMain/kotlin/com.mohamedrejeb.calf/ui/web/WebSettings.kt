@@ -19,8 +19,6 @@ class WebSettings internal constructor(
 
     val iosSettings = IosSettings()
 
-    val desktopSettings = DesktopSettings()
-
     class AndroidSettings internal constructor(
         private val onSettingsChanged: () -> Unit
     ) {
@@ -135,6 +133,4 @@ class WebSettings internal constructor(
     }
 
     class IosSettings
-
-    class DesktopSettings
 }

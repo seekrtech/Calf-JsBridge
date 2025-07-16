@@ -12,7 +12,7 @@ implementation("com.mohamedrejeb.calf:calf-webview:0.6.1")
 
 ## Usage
 
-`WebView` is a view that adapts to the platform it is running on. It is a wrapper around `WebView` on Android, `WKWebView` on iOS and JavaFX `WebView` on Desktop.
+`WebView` is a view that adapts to the platform it is running on. It is a wrapper around `WebView` on Android and `WKWebView` on iOS.
 
 | Android                                         | iOS                                     |
 |-------------------------------------------------|-----------------------------------------|

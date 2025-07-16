@@ -1,23 +1,33 @@
-import org.gradle.internal.os.OperatingSystem
-
 plugins {
-    id("compose.multiplatform")
+    id("kotlin-multiplatform")
+    id("android.library")
+    id("org.jetbrains.compose")
+    id("org.jetbrains.kotlin.plugin.compose")
     id("module.publication")
     kotlin("plugin.serialization")
 }
 
-val os: OperatingSystem = OperatingSystem.current()
-val arch: String = System.getProperty("os.arch")
-val isAarch64: Boolean = arch.contains("aarch64")
-
-val platform =
-    when {
-        os.isWindows -> "win"
-        os.isMacOsX -> "mac"
-        else -> "linux"
-    } + if (isAarch64) "-aarch64" else ""
+// Apply Android library setup
+androidLibrarySetup()
 
 kotlin {
+    // Custom targets for webview - only Android and iOS
+    androidTarget {
+        publishLibraryVariants("release")
+        compilerOptions {
+            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_1_8)
+        }
+    }
+
+    jvmToolchain(11)
+    
+    iosX64()
+    iosArm64()
+    iosSimulatorArm64()
+    
+    // Apply hierarchy template for proper source set organization
+    applyDefaultHierarchyTemplate()
+    
     sourceSets.commonMain.dependencies {
         implementation(compose.runtime)
         implementation(compose.foundation)
@@ -29,15 +39,5 @@ kotlin {
     sourceSets.androidMain.dependencies {
         implementation(libs.activity.compose)
         implementation(libs.kotlinx.coroutines.android)
-    }
-
-    sourceSets.desktopMain.dependencies {
-        implementation("org.openjfx:javafx-base:19:$platform")
-        implementation("org.openjfx:javafx-graphics:19:$platform")
-        implementation("org.openjfx:javafx-controls:19:$platform")
-        implementation("org.openjfx:javafx-media:19:$platform")
-        implementation("org.openjfx:javafx-web:19:$platform")
-        implementation("org.openjfx:javafx-swing:19:$platform")
-        implementation(libs.kotlinx.coroutines.swing)
     }
 }
