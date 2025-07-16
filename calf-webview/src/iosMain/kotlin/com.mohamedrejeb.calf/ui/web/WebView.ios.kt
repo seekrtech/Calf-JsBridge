@@ -22,6 +22,7 @@ import platform.Foundation.NSMutableURLRequest
 import platform.Foundation.NSUTF8StringEncoding
 import platform.WebKit.*
 import platform.darwin.NSObject
+import platform.UIKit.UIScrollViewContentInsetAdjustmentBehavior
 
 actual typealias PlatformWebView = WKWebView
 
@@ -75,7 +76,6 @@ actual fun WebView(
                             urlRequest.setValue(value = value, forHTTPHeaderField = key)
                         }
                         wv.loadRequest(urlRequest)
-                        wv.allowsBackForwardNavigationGestures = true
                     }
 
                     is WebContent.Data -> {
@@ -100,9 +100,6 @@ actual fun WebView(
     UIKitView(
         factory = {
             WKWebView().apply {
-                // Enable user interaction for touch events
-                setUserInteractionEnabled(true)
-                
                 // Configure back/forward gesture handling separately
                 allowsBackForwardNavigationGestures = captureBackPresses
 
@@ -126,8 +123,8 @@ actual fun WebView(
             interactionMode = UIKitInteropInteractionMode.NonCooperative,
         ),
         onRelease = {
-            onDispose(it)
             state.webView = null
+            onDispose(it)
         },
         modifier = modifier,
     )
@@ -226,6 +223,31 @@ private fun WKWebView.applySettings(webSettings: WebSettings) {
     configuration.defaultWebpagePreferences.allowsContentJavaScript = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptEnabled = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = webSettings.javaScriptCanOpenWindowsAutomatically
+    
+    // Configure viewport and content sizing settings similar to Android
+    configuration.defaultWebpagePreferences.preferredContentMode = WKContentMode.WKContentModeRecommended
+    
+    // Apply iOS-specific settings
+    val iosSettings = webSettings.iosSettings
+
+    configuration.mediaTypesRequiringUserActionForPlayback = when (iosSettings.mediaTypesRequiringUserActionForPlayback) {
+        WebSettings.IosSettings.AudiovisualMediaType.None -> WKAudiovisualMediaTypeNone
+        WebSettings.IosSettings.AudiovisualMediaType.Audio -> WKAudiovisualMediaTypeAudio
+        WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
+        WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
+    }
+    setInspectable(iosSettings.isInspectable)
+    opaque = iosSettings.isOpaque
+
+    scrollView.minimumZoomScale = iosSettings.minimumZoomScale
+    scrollView.maximumZoomScale = iosSettings.maximumZoomScale
+    scrollView.zoomScale = iosSettings.zoomScale
+    scrollView.contentInsetAdjustmentBehavior = when (iosSettings.contentInsetAdjustmentBehavior) {
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.Never -> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentNever
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.ScrollableAxes-> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentScrollableAxes
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.Always -> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentAlways
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.Automatic -> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentAutomatic
+    }
 }
 
 // Use Dispatchers.Main to ensure that the webview methods are called on UI thread
