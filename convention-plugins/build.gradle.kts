@@ -23,7 +23,6 @@ dependencies {
     implementation(libs.gradlePlugin.jetbrainsCompose)
     implementation(libs.gradlePlugin.kotlin)
     implementation(libs.gradlePlugin.composeCompiler)
-    implementation(libs.nexus.publish)
 
     // hack to access version catalogue https://github.com/gradle/gradle/issues/15383
     compileOnly(files(libs.javaClass.superclass.protectionDomain.codeSource.location))

@@ -4,7 +4,6 @@ import org.gradle.kotlin.dsl.`maven-publish`
 
 plugins {
     `maven-publish`
-    signing
 }
 
 publishing {
@@ -18,11 +17,11 @@ publishing {
             },
         )
 
-        // Provide artifacts information required by Maven Central
+        // Provide artifacts information for GitHub Packages
         pom {
             name.set("Calf - Compose Adaptive Look & Feel")
             description.set("Calf is a library that allows you to easily create adaptive UIs for your Compose Multiplatform apps.")
-            url.set("https://github.com/MohamedRejeb/Calf")
+            url.set("https://github.com/${System.getenv("GITHUB_REPOSITORY") ?: "YourUsername/YourRepositoryName"}")
 
             licenses {
                 license {
@@ -39,33 +38,12 @@ publishing {
             }
             issueManagement {
                 system.set("Github")
-                url.set("https://github.com/MohamedRejeb/Calf/issues")
+                url.set("https://github.com/${System.getenv("GITHUB_REPOSITORY") ?: "YourUsername/YourRepositoryName"}/issues")
             }
             scm {
-                connection.set("https://github.com/MohamedRejeb/Calf.git")
-                url.set("https://github.com/MohamedRejeb/Calf")
+                connection.set("https://github.com/${System.getenv("GITHUB_REPOSITORY") ?: "YourUsername/YourRepositoryName"}.git")
+                url.set("https://github.com/${System.getenv("GITHUB_REPOSITORY") ?: "YourUsername/YourRepositoryName"}")
             }
         }
-    }
-}
-
-signing {
-    val signingKeyId = System.getenv("OSSRH_GPG_SECRET_KEY_ID")
-    val signingKey = System.getenv("OSSRH_GPG_SECRET_KEY")
-    val signingPassword = System.getenv("OSSRH_GPG_SECRET_KEY_PASSWORD")
-    
-    if (signingKeyId != null && signingKey != null && signingPassword != null) {
-        useInMemoryPgpKeys(signingKeyId, signingKey, signingPassword)
-        sign(publishing.publications)
-    }
-}
-
-// TODO: remove after https://youtrack.jetbrains.com/issue/KT-46466 is fixed
-project.tasks.withType(AbstractPublishToMaven::class.java).configureEach {
-    val hasSigningKeys = System.getenv("OSSRH_GPG_SECRET_KEY_ID") != null &&
-                        System.getenv("OSSRH_GPG_SECRET_KEY") != null &&
-                        System.getenv("OSSRH_GPG_SECRET_KEY_PASSWORD") != null
-    if (hasSigningKeys) {
-        dependsOn(project.tasks.withType(Sign::class.java))
     }
 }
