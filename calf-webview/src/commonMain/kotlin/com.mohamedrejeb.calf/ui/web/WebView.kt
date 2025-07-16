@@ -136,7 +136,10 @@ expect class WebViewState(webContent: WebContent) {
  * @see [rememberWebViewNavigator]
  */
 @Stable
-public class WebViewNavigator(private val coroutineScope: CoroutineScope) {
+public class WebViewNavigator(
+    private val coroutineScope: CoroutineScope,
+    public val requestInterceptor: com.mohamedrejeb.calf.ui.web.request.RequestInterceptor? = null
+) {
     internal sealed interface NavigationEvent {
         data object Back : NavigationEvent
         data object Forward : NavigationEvent
@@ -237,8 +240,9 @@ public class WebViewNavigator(private val coroutineScope: CoroutineScope) {
  */
 @Composable
 public fun rememberWebViewNavigator(
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
-): WebViewNavigator = remember(coroutineScope) { WebViewNavigator(coroutineScope) }
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
+    requestInterceptor: com.mohamedrejeb.calf.ui.web.request.RequestInterceptor? = null
+): WebViewNavigator = remember(coroutineScope, requestInterceptor) { WebViewNavigator(coroutineScope, requestInterceptor) }
 
 /**
  * Creates a WebView state that is remembered across Compositions.

@@ -338,6 +338,51 @@ public open class AccompanistWebViewClient : WebViewClient() {
             state.errorsForCurrentRequest.add(WebViewError(request, error))
         }
     }
+
+    private var isRedirect = false
+
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        if (isRedirect || request == null || navigator.requestInterceptor == null) {
+            isRedirect = false
+            return super.shouldOverrideUrlLoading(view, request)
+        }
+        
+        val isRedirectRequest = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+            request.isRedirect
+        } else {
+            false
+        }
+        
+        val webRequest = com.mohamedrejeb.calf.ui.web.request.WebRequest(
+            url = request.url.toString(),
+            headers = request.requestHeaders?.toMutableMap() ?: mutableMapOf(),
+            isForMainFrame = request.isForMainFrame,
+            isRedirect = isRedirectRequest,
+            method = request.method ?: "GET"
+        )
+        
+        val interceptResult = navigator.requestInterceptor!!.onInterceptUrlRequest(
+            webRequest,
+            navigator
+        )
+        
+        return when (interceptResult) {
+            is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Allow -> {
+                false
+            }
+            is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Reject -> {
+                true
+            }
+            is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Modify -> {
+                isRedirect = true
+                interceptResult.request.apply {
+                    navigator.stopLoading()
+                    navigator.loadUrl(this.url, this.headers)
+                }
+                true
+            }
+        }
+    }
 }
 
 /**

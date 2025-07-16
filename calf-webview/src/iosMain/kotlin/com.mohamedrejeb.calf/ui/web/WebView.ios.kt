@@ -13,6 +13,7 @@ import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import platform.Foundation.HTTPMethod
 import platform.Foundation.NSString
 import platform.Foundation.create
 import platform.Foundation.setValue
@@ -20,6 +21,7 @@ import platform.Foundation.dataUsingEncoding
 import platform.Foundation.NSURL
 import platform.Foundation.NSMutableURLRequest
 import platform.Foundation.NSUTF8StringEncoding
+import platform.Foundation.allHTTPHeaderFields
 import platform.WebKit.*
 import platform.darwin.NSObject
 import platform.UIKit.UIScrollViewContentInsetAdjustmentBehavior
@@ -114,6 +116,7 @@ actual fun WebView(
                 }
                 
                 state.webView = this
+                state.navigator = navigator
                 navigationDelegate = state
 
                 onCreated(this)
@@ -140,6 +143,7 @@ actual class WebViewState actual constructor(
 ): NSObject(), WKNavigationDelegateProtocol {
     
     internal var webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null
+    internal var navigator: WebViewNavigator? = null
     actual var lastLoadedUrl: String? by mutableStateOf(null)
         internal set
 
@@ -216,6 +220,60 @@ actual class WebViewState actual constructor(
     @ObjCSignatureOverride
     override fun webView(webView: WKWebView, didCommitNavigation: WKNavigation?) {
         loadingState = LoadingState.Loading(webView.estimatedProgress.toFloat())
+    }
+
+    private var isRedirect = false
+
+    @OptIn(ExperimentalForeignApi::class)
+    override fun webView(
+        webView: WKWebView,
+        decidePolicyForNavigationAction: WKNavigationAction,
+        decisionHandler: (WKNavigationActionPolicy) -> Unit
+    ) {
+        val url = decidePolicyForNavigationAction.request.URL?.absoluteString
+        
+        if (url != null && !isRedirect &&
+            navigator?.requestInterceptor != null &&
+            decidePolicyForNavigationAction.targetFrame?.mainFrame != false
+        ) {
+            navigator?.requestInterceptor?.apply {
+                val request = decidePolicyForNavigationAction.request
+                val headerMap = mutableMapOf<String, String>()
+                request.allHTTPHeaderFields?.forEach {
+                    headerMap[it.key.toString()] = it.value.toString()
+                }
+                
+                val webRequest = com.mohamedrejeb.calf.ui.web.request.WebRequest(
+                    url = request.URL?.absoluteString ?: "",
+                    headers = headerMap,
+                    isForMainFrame = decidePolicyForNavigationAction.targetFrame?.mainFrame ?: false,
+                    isRedirect = isRedirect,
+                    method = request.HTTPMethod ?: "GET"
+                )
+                
+                val interceptResult = this.onInterceptUrlRequest(webRequest, navigator!!)
+                
+                when (interceptResult) {
+                    is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Allow -> {
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyAllow)
+                    }
+                    is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Reject -> {
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
+                    }
+                    is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Modify -> {
+                        isRedirect = true
+                        interceptResult.request.apply {
+                            navigator!!.stopLoading()
+                            navigator!!.loadUrl(this.url, this.headers)
+                        }
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
+                    }
+                }
+            }
+        } else {
+            isRedirect = false
+            decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyAllow)
+        }
     }
 }
 
