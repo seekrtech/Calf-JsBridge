@@ -11,9 +11,11 @@ import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
+import kotlinx.cinterop.readValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import platform.CoreGraphics.CGRectZero
 import platform.Foundation.HTTPMethod
 import platform.Foundation.NSString
 import platform.Foundation.create
@@ -106,7 +108,29 @@ actual fun WebView(
 
     UIKitView(
         factory = {
-            WKWebView().apply {
+            val config = WKWebViewConfiguration().apply {
+                val webSettings = state.settings
+                defaultWebpagePreferences.allowsContentJavaScript = webSettings.javaScriptEnabled
+                preferences.javaScriptEnabled = webSettings.javaScriptEnabled
+                preferences.javaScriptCanOpenWindowsAutomatically = webSettings.javaScriptCanOpenWindowsAutomatically
+
+                // Configure viewport and content sizing settings similar to Android
+                defaultWebpagePreferences.preferredContentMode = WKContentMode.WKContentModeRecommended
+
+                // Apply iOS-specific settings
+                val iosSettings = webSettings.iosSettings
+
+                mediaTypesRequiringUserActionForPlayback = when (iosSettings.mediaTypesRequiringUserActionForPlayback) {
+                    WebSettings.IosSettings.AudiovisualMediaType.None -> WKAudiovisualMediaTypeNone
+                    WebSettings.IosSettings.AudiovisualMediaType.Audio -> WKAudiovisualMediaTypeAudio
+                    WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
+                    WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
+                }
+            }
+            WKWebView(
+                frame = CGRectZero.readValue(),
+                configuration = config,
+            ).apply {
                 // Configure back/forward gesture handling separately
                 allowsBackForwardNavigationGestures = captureBackPresses
 
@@ -287,10 +311,10 @@ private fun WKWebView.applySettings(webSettings: WebSettings) {
     configuration.defaultWebpagePreferences.allowsContentJavaScript = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptEnabled = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = webSettings.javaScriptCanOpenWindowsAutomatically
-    
+
     // Configure viewport and content sizing settings similar to Android
     configuration.defaultWebpagePreferences.preferredContentMode = WKContentMode.WKContentModeRecommended
-    
+
     // Apply iOS-specific settings
     val iosSettings = webSettings.iosSettings
 
