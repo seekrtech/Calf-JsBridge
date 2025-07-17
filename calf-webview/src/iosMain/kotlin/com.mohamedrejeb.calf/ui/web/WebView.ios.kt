@@ -232,10 +232,8 @@ actual class WebViewState actual constructor(
     ) {
         val url = decidePolicyForNavigationAction.request.URL?.absoluteString
         
-        if (url != null && !isRedirect &&
-            navigator?.requestInterceptor != null &&
-            decidePolicyForNavigationAction.targetFrame?.mainFrame != false
-        ) {
+        // Intercept ALL navigation requests (including target="_blank") when interceptor is available
+        if (url != null && !isRedirect && navigator?.requestInterceptor != null) {
             navigator?.requestInterceptor?.apply {
                 val request = decidePolicyForNavigationAction.request
                 val headerMap = mutableMapOf<String, String>()
@@ -243,10 +241,13 @@ actual class WebViewState actual constructor(
                     headerMap[it.key.toString()] = it.value.toString()
                 }
                 
+                // Determine target type based on frame information
+                val isMainFrame = decidePolicyForNavigationAction.targetFrame?.mainFrame ?: false
+                
                 val webRequest = com.mohamedrejeb.calf.ui.web.request.WebRequest(
                     url = request.URL?.absoluteString ?: "",
                     headers = headerMap,
-                    isForMainFrame = decidePolicyForNavigationAction.targetFrame?.mainFrame ?: false,
+                    isForMainFrame = isMainFrame,
                     isRedirect = isRedirect,
                     method = request.HTTPMethod ?: "GET"
                 )

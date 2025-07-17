@@ -28,6 +28,8 @@ import com.mohamedrejeb.calf.ui.web.rememberWebViewNavigator
  * 2. Intercept and modify requests
  * 3. Block certain requests
  * 4. Redirect requests to different URLs
+ * 5. Handle external links (likely target="_blank") using isForMainFrame
+ * 6. Distinguish between main frame and external navigation
  */
 @Composable
 fun RequestInterceptorExample() {
@@ -40,9 +42,21 @@ fun RequestInterceptorExample() {
                 request: WebRequest,
                 navigator: WebViewNavigator,
             ): WebRequestInterceptResult {
-                println("Intercepting request: ${request.url}")
+                println("Intercepting request: ${request.url} (isForMainFrame: ${request.isForMainFrame})")
                 
                 return when {
+                    // Handle external links (likely target="_blank" or iframe) specially
+                    !request.isForMainFrame && request.url.contains("example.com") -> {
+                        println("Intercepted external link to example.com - blocking it")
+                        WebRequestInterceptResult.Reject
+                    }
+                    
+                    // Allow other external links but log them
+                    !request.isForMainFrame -> {
+                        println("Allowing external link to: ${request.url}")
+                        WebRequestInterceptResult.Allow
+                    }
+                    
                     // Redirect any URL containing "kotlin" to Kotlin documentation
                     request.url.contains("kotlin", ignoreCase = true) -> {
                         WebRequestInterceptResult.Modify(
@@ -83,6 +97,8 @@ fun RequestInterceptorExample() {
         Text(
             text = "• URLs containing 'kotlin' will be redirected to Kotlin docs\n" +
                     "• URLs containing 'ads' will be blocked\n" +
+                    "• External links (non-main frame) to example.com will be blocked\n" +
+                    "• Other external links will be allowed and logged\n" +
                     "• All other requests will be allowed",
             modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
