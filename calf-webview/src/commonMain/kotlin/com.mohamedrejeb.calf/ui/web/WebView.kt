@@ -13,6 +13,8 @@ import androidx.compose.ui.Modifier
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 expect class PlatformWebView
 
@@ -44,6 +46,7 @@ expect fun WebView(
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
+    loadContentDelay: Duration = 0.milliseconds,
     onCreated: (PlatformWebView) -> Unit = {},
     onDispose: (PlatformWebView) -> Unit = {},
 )

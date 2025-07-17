@@ -30,7 +30,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 actual typealias PlatformWebView = WebView
 
@@ -66,6 +69,7 @@ actual fun WebView(
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
+    loadContentDelay: Duration,
     onCreated: (PlatformWebView) -> Unit,
     onDispose: (PlatformWebView) -> Unit,
 ) {
@@ -99,6 +103,7 @@ actual fun WebView(
             captureBackPresses,
             navigator,
             webViewJsBridge,
+            loadContentDelay,
             {
                 it.settings.standardFontFamily = "sans-serif"
                 it.settings.defaultFontSize = 16
@@ -163,6 +168,7 @@ internal fun WebView(
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
+    loadContentDelay: Duration = 0.milliseconds,
     onCreated: (WebView) -> Unit = {},
     onDispose: (WebView) -> Unit = {},
     client: AccompanistWebViewClient = remember { AccompanistWebViewClient() },
@@ -182,6 +188,7 @@ internal fun WebView(
 
         LaunchedEffect(wv, state) {
             snapshotFlow { state.content }.collect { content ->
+                delay(loadContentDelay)
                 when (content) {
                     is WebContent.Url -> {
                         wv.loadUrl(content.url, content.additionalHttpHeaders)

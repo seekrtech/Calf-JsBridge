@@ -12,6 +12,7 @@ import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import platform.Foundation.HTTPMethod
 import platform.Foundation.NSString
@@ -25,6 +26,8 @@ import platform.Foundation.allHTTPHeaderFields
 import platform.WebKit.*
 import platform.darwin.NSObject
 import platform.UIKit.UIScrollViewContentInsetAdjustmentBehavior
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 actual typealias PlatformWebView = WKWebView
 
@@ -57,6 +60,7 @@ actual fun WebView(
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
+    loadContentDelay: Duration,
     onCreated: (PlatformWebView) -> Unit,
     onDispose: (PlatformWebView) -> Unit,
 ) {
@@ -69,6 +73,7 @@ actual fun WebView(
 
         LaunchedEffect(wv, state) {
             snapshotFlow { state.content }.collect { content ->
+                delay(loadContentDelay)
                 when (content) {
                     is WebContent.Url -> {
                         val url = NSURL(string = content.url)
