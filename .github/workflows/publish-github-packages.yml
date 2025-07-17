@@ -13,7 +13,7 @@ on:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: [ self-hosted, macos ]
     permissions:
       contents: read
       packages: write
