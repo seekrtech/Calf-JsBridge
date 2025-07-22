@@ -43,6 +43,7 @@ expect class PlatformWebView
 expect fun WebView(
     state: WebViewState,
     modifier: Modifier = Modifier,
+    alpha: Float = 1F,
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,

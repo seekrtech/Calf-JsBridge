@@ -28,6 +28,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.viewinterop.AndroidView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -66,6 +67,7 @@ actual typealias PlatformWebView = WebView
 actual fun WebView(
     state: WebViewState,
     modifier: Modifier,
+    alpha: Float,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
@@ -76,7 +78,9 @@ actual fun WebView(
     val client = remember { AccompanistWebViewClient() }
     val chromeClient = remember { AccompanistWebChromeClient() }
 
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(
+        modifier.alpha(alpha)
+    ) {
         // WebView changes it's layout strategy based on
         // it's layoutParams. We convert from Compose Modifier to
         // layout params here.

@@ -59,6 +59,7 @@ actual typealias PlatformWebView = WKWebView
 actual fun WebView(
     state: WebViewState,
     modifier: Modifier,
+    alpha: Float,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
     webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
@@ -131,6 +132,7 @@ actual fun WebView(
                 frame = CGRectZero.readValue(),
                 configuration = config,
             ).apply {
+                setAlpha(alpha.toDouble())
                 // Configure back/forward gesture handling separately
                 allowsBackForwardNavigationGestures = captureBackPresses
 
