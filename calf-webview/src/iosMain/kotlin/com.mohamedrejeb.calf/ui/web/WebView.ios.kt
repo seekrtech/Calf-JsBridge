@@ -153,6 +153,9 @@ actual fun WebView(
                 onCreated(this)
             }
         },
+        update = {
+            it.setAlpha(alpha.toDouble())
+        },
         properties = UIKitInteropProperties(
             interactionMode = UIKitInteropInteractionMode.NonCooperative,
         ),
