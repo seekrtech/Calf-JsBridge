@@ -13,6 +13,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -30,6 +31,11 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.viewinterop.AndroidView
+import com.mohamedrejeb.calf.ui.web.jsbridge.AndroidJsBridgeInterface
+import com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector
+import com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge
+import com.mohamedrejeb.calf.ui.web.request.WebRequest
+import com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
@@ -70,7 +76,7 @@ actual fun WebView(
     alpha: Float,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
-    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
+    webViewJsBridge: WebViewJsBridge?,
     loadContentDelay: Duration,
     onCreated: (PlatformWebView) -> Unit,
     onDispose: (PlatformWebView) -> Unit,
@@ -171,7 +177,7 @@ internal fun WebView(
     modifier: Modifier = Modifier,
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
-    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
+    webViewJsBridge: WebViewJsBridge? = null,
     loadContentDelay: Duration = 0.milliseconds,
     onCreated: (WebView) -> Unit = {},
     onDispose: (WebView) -> Unit = {},
@@ -241,7 +247,7 @@ internal fun WebView(
 
                 // Setup JavaScript bridge if provided
                 webViewJsBridge?.let { bridge ->
-                    val androidInterface = com.mohamedrejeb.calf.ui.web.jsbridge.AndroidJsBridgeInterface(bridge)
+                    val androidInterface = AndroidJsBridgeInterface(bridge)
                     addJavascriptInterface(androidInterface, "androidJsBridge")
                 }
 
@@ -299,7 +305,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
         internal set
     public open lateinit var navigator: WebViewNavigator
         internal set
-    public open var webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null
+    public open var webViewJsBridge: WebViewJsBridge? = null
         internal set
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
@@ -318,7 +324,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
         
         // Inject JavaScript bridge when page is finished loading
         webViewJsBridge?.let { bridge ->
-            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(state, bridge)
+            JsBridgeInjector.injectJsBridge(state, bridge)
             
             // Inject Android-specific bridge connection
             val androidScript = """
@@ -327,7 +333,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
                 };
             """.trimIndent()
             
-            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(state, bridge, androidScript)
+            JsBridgeInjector.injectPlatformBridge(state, bridge, androidScript)
         }
     }
 
@@ -338,6 +344,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
         navigator.canGoForward = view.canGoForward()
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onReceivedError(
         view: WebView,
         request: WebResourceRequest?,
@@ -346,7 +353,13 @@ public open class AccompanistWebViewClient : WebViewClient() {
         super.onReceivedError(view, request, error)
 
         if (error != null) {
-            state.errorsForCurrentRequest.add(WebViewError(request, error))
+            state.errorsForCurrentRequest.add(
+                WebViewError(
+                    code = error.errorCode,
+                    description = error.description.toString(),
+                    isFromMainFrame = request?.isForMainFrame ?: false,
+                ),
+            )
         }
     }
 
@@ -358,13 +371,13 @@ public open class AccompanistWebViewClient : WebViewClient() {
             return super.shouldOverrideUrlLoading(view, request)
         }
         
-        val isRedirectRequest = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.N) {
+        val isRedirectRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
             request.isRedirect
         } else {
             false
         }
         
-        val webRequest = com.mohamedrejeb.calf.ui.web.request.WebRequest(
+        val webRequest = WebRequest(
             url = request.url.toString(),
             headers = request.requestHeaders?.toMutableMap() ?: mutableMapOf(),
             isForMainFrame = request.isForMainFrame,
@@ -378,13 +391,13 @@ public open class AccompanistWebViewClient : WebViewClient() {
         )
         
         return when (interceptResult) {
-            is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Allow -> {
+            is WebRequestInterceptResult.Allow -> {
                 false
             }
-            is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Reject -> {
+            is WebRequestInterceptResult.Reject -> {
                 true
             }
-            is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Modify -> {
+            is WebRequestInterceptResult.Modify -> {
                 isRedirect = true
                 interceptResult.request.apply {
                     navigator.stopLoading()
@@ -453,6 +466,13 @@ actual class WebViewState actual constructor(webContent: WebContent) {
         get() = loadingState !is LoadingState.Finished
 
     /**
+     * A list for errors captured in the last load. Reset when a new page is loaded.
+     * Errors could be from any resource (iframe, image, etc.), not just for the main page.
+     * To filter for only main frame errors, use [WebViewError.isFromMainFrame].
+     */
+    actual val errorsForCurrentRequest: SnapshotStateList<WebViewError> = mutableStateListOf()
+
+    /**
      * The title received from the loaded content of the current page
      */
     actual var pageTitle: String? by mutableStateOf(null)
@@ -478,13 +498,6 @@ actual class WebViewState actual constructor(webContent: WebContent) {
      */
     public var pageIcon: Bitmap? by mutableStateOf(null)
         internal set
-
-    /**
-     * A list for errors captured in the last load. Reset when a new page is loaded.
-     * Errors could be from any resource (iframe, image, etc.), not just for the main page.
-     * For more fine grained control use the OnError callback of the WebView.
-     */
-    val errorsForCurrentRequest: SnapshotStateList<WebViewError> = mutableStateListOf()
 
     /**
      * The saved view state from when the view was destroyed last. To restore state,
@@ -524,21 +537,6 @@ internal suspend fun WebViewNavigator.handleNavigationEvents(
         }
     }
 }
-
-/**
- * A wrapper class to hold errors from the WebView.
- */
-@Immutable
-public data class WebViewError(
-    /**
-     * The request the error came from.
-     */
-    val request: WebResourceRequest?,
-    /**
-     * The error that was reported.
-     */
-    val error: WebResourceError
-)
 
 actual val WebStateSaver: Saver<WebViewState, Any> = run {
     val pageTitleKey = "pagetitle"

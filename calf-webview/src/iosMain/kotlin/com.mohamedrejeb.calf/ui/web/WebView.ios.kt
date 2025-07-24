@@ -3,6 +3,7 @@ package com.mohamedrejeb.calf.ui.web
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitInteropInteractionMode
@@ -17,6 +18,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import platform.CoreGraphics.CGRectZero
 import platform.Foundation.HTTPMethod
+import platform.Foundation.NSError
 import platform.Foundation.NSString
 import platform.Foundation.create
 import platform.Foundation.setValue
@@ -199,6 +201,8 @@ actual class WebViewState actual constructor(
     actual val isLoading: Boolean
         get() = loadingState !is LoadingState.Finished
 
+    actual val errorsForCurrentRequest: SnapshotStateList<WebViewError> = mutableStateListOf()
+
     /**
      * The title received from the loaded content of the current page
      */
@@ -230,6 +234,18 @@ actual class WebViewState actual constructor(
     var webView by mutableStateOf<WKWebView?>(null)
         internal set
 
+    /**
+     * Called when the web view begins to receive web content.
+     */
+    @ObjCSignatureOverride
+    override fun webView(
+        webView: WKWebView,
+        didStartProvisionalNavigation: WKNavigation?,
+    ) {
+        errorsForCurrentRequest.clear()
+    }
+
+
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     @ObjCSignatureOverride
     override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
@@ -248,6 +264,24 @@ actual class WebViewState actual constructor(
             
             com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(this, bridge, iosScript)
         }
+    }
+
+    /**
+     * Called when the web view fails to load content.
+     */
+    override fun webView(
+        webView: WKWebView,
+        didFailProvisionalNavigation: WKNavigation?,
+        withError: NSError,
+    ) {
+        errorsForCurrentRequest.add(
+            WebViewError(
+                code = withError.code.toInt(),
+                description = withError.localizedDescription,
+                // on iOS all errors are from the main frame
+                isFromMainFrame = true,
+            ),
+        )
     }
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")

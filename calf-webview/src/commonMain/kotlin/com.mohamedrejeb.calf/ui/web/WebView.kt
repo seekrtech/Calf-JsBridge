@@ -9,7 +9,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import com.mohamedrejeb.calf.ui.web.LoadingState.Finished
+import com.mohamedrejeb.calf.ui.web.LoadingState.Loading
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -121,6 +124,13 @@ expect class WebViewState(webContent: WebContent) {
      * Whether the webview is currently loading data in its main frame
      */
     public val isLoading: Boolean
+
+    /**
+     * A list for errors captured in the last load. Reset when a new page is loaded.
+     * Errors could be from any resource (iframe, image, etc.), not just for the main page.
+     * To filter for only main frame errors, use [WebViewError.isFromMainFrame].
+     */
+    public val errorsForCurrentRequest: SnapshotStateList<WebViewError>
 
     /**
      * The title received from the loaded content of the current page
