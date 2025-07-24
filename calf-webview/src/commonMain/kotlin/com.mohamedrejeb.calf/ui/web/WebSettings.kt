@@ -160,6 +160,12 @@ class WebSettings internal constructor(
                 onSettingsChanged()
             }
 
+        var bounces: Boolean = true
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
         var minimumZoomScale = 1.0
             set(value) {
                 field = value

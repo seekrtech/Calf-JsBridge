@@ -332,6 +332,7 @@ private fun WKWebView.applySettings(webSettings: WebSettings) {
     setInspectable(iosSettings.isInspectable)
     opaque = iosSettings.isOpaque
 
+    scrollView.bounces = iosSettings.bounces
     scrollView.minimumZoomScale = iosSettings.minimumZoomScale
     scrollView.maximumZoomScale = iosSettings.maximumZoomScale
     scrollView.zoomScale = iosSettings.zoomScale
