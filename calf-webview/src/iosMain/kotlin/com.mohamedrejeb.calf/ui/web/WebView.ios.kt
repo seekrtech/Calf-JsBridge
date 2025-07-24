@@ -406,7 +406,13 @@ internal suspend fun WebViewNavigator.handleNavigationEvents(
             }
 
             is WebViewNavigator.NavigationEvent.LoadUrl -> {
-                loadUrl(event.url, event.additionalHttpHeaders)
+                val url = NSURL(string = event.url)
+                val urlRequest = NSMutableURLRequest()
+                urlRequest.setURL(url)
+                event.additionalHttpHeaders.forEach { (key, value) ->
+                    urlRequest.setValue(value = value, forHTTPHeaderField = key)
+                }
+                webView.loadRequest(urlRequest)
             }
         }
     }
