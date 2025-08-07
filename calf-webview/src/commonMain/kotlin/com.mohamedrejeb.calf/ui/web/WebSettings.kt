@@ -148,7 +148,7 @@ class WebSettings internal constructor(
                 onSettingsChanged()
             }
 
-        var isInspectable = true
+        var isInspectable = false
             set(value) {
                 field = value
                 onSettingsChanged()

@@ -1,8 +1,15 @@
 package com.mohamedrejeb.calf.ui.web
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
@@ -19,19 +26,30 @@ import kotlinx.coroutines.withContext
 import platform.CoreGraphics.CGRectZero
 import platform.Foundation.HTTPMethod
 import platform.Foundation.NSError
-import platform.Foundation.NSString
-import platform.Foundation.create
-import platform.Foundation.setValue
-import platform.Foundation.dataUsingEncoding
-import platform.Foundation.NSURL
 import platform.Foundation.NSMutableURLRequest
+import platform.Foundation.NSString
+import platform.Foundation.NSURL
 import platform.Foundation.NSUTF8StringEncoding
 import platform.Foundation.allHTTPHeaderFields
-import platform.WebKit.*
-import platform.darwin.NSObject
+import platform.Foundation.create
+import platform.Foundation.dataUsingEncoding
+import platform.Foundation.setValue
 import platform.UIKit.UIScrollViewContentInsetAdjustmentBehavior
+import platform.WebKit.WKAudiovisualMediaTypeAll
+import platform.WebKit.WKAudiovisualMediaTypeAudio
+import platform.WebKit.WKAudiovisualMediaTypeNone
+import platform.WebKit.WKAudiovisualMediaTypeVideo
+import platform.WebKit.WKContentMode
+import platform.WebKit.WKNavigation
+import platform.WebKit.WKNavigationAction
+import platform.WebKit.WKNavigationActionPolicy
+import platform.WebKit.WKNavigationDelegateProtocol
+import platform.WebKit.WKWebView
+import platform.WebKit.WKWebViewConfiguration
+import platform.WebKit.javaScriptEnabled
+import platform.darwin.NSObject
+import platform.darwin.sel_getUid
 import kotlin.time.Duration
-import kotlin.time.Duration.Companion.milliseconds
 
 actual typealias PlatformWebView = WKWebView
 
@@ -346,6 +364,7 @@ actual class WebViewState actual constructor(
     }
 }
 
+@OptIn(ExperimentalForeignApi::class)
 private fun WKWebView.applySettings(webSettings: WebSettings) {
     configuration.defaultWebpagePreferences.allowsContentJavaScript = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptEnabled = webSettings.javaScriptEnabled
@@ -363,7 +382,10 @@ private fun WKWebView.applySettings(webSettings: WebSettings) {
         WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
         WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
     }
-    setInspectable(iosSettings.isInspectable)
+
+    if (respondsToSelector(sel_getUid("setInspectable:"))) {
+        setInspectable(iosSettings.isInspectable)
+    }
     opaque = iosSettings.isOpaque
 
     scrollView.bounces = iosSettings.bounces
