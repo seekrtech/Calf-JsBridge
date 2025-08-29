@@ -9,7 +9,6 @@ import android.os.Build
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
-import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
@@ -39,7 +38,7 @@ internal fun PermissionLifecycleCheckerEffect(
                 }
             }
         }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, permissionCheckerObserver) {
         lifecycle.addObserver(permissionCheckerObserver)
         onDispose { lifecycle.removeObserver(permissionCheckerObserver) }
@@ -72,7 +71,7 @@ internal fun PermissionsLifecycleCheckerEffect(
                 }
             }
         }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current.lifecycle
     DisposableEffect(lifecycle, permissionsCheckerObserver) {
         lifecycle.addObserver(permissionsCheckerObserver)
         onDispose { lifecycle.removeObserver(permissionsCheckerObserver) }
@@ -104,9 +103,24 @@ internal fun Permission.toAndroidPermission(): String {
     return when (this) {
         Permission.Call -> Manifest.permission.CALL_PHONE
         Permission.Camera -> Manifest.permission.CAMERA
-        Permission.Gallery -> Manifest.permission.READ_EXTERNAL_STORAGE
-        Permission.ReadStorage -> Manifest.permission.READ_EXTERNAL_STORAGE
-        Permission.WriteStorage -> Manifest.permission.WRITE_EXTERNAL_STORAGE
+        Permission.Gallery ->
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            else
+                ""
+
+        Permission.ReadStorage ->
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.READ_EXTERNAL_STORAGE
+            else
+                ""
+
+        Permission.WriteStorage ->
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+                Manifest.permission.WRITE_EXTERNAL_STORAGE
+            else
+                ""
+
         Permission.ReadImage ->
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
                 Manifest.permission.READ_MEDIA_IMAGES
@@ -127,6 +141,11 @@ internal fun Permission.toAndroidPermission(): String {
 
         Permission.FineLocation -> Manifest.permission.ACCESS_FINE_LOCATION
         Permission.CoarseLocation -> Manifest.permission.ACCESS_COARSE_LOCATION
+        Permission.BackgroundLocation -> if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
+            Manifest.permission.ACCESS_BACKGROUND_LOCATION
+        else
+            ""
+
         Permission.RemoteNotification -> Manifest.permission.RECEIVE_BOOT_COMPLETED
         Permission.RecordAudio -> Manifest.permission.RECORD_AUDIO
         Permission.BluetoothLe -> Manifest.permission.BLUETOOTH
@@ -155,7 +174,18 @@ internal fun Permission.toAndroidPermission(): String {
                 ""
 
         Permission.ReadContacts -> Manifest.permission.READ_CONTACTS
+        Permission.ReadCalendar -> Manifest.permission.READ_CALENDAR
+        Permission.WriteCalendar -> Manifest.permission.WRITE_CALENDAR
+        Permission.WifiAccessState -> Manifest.permission.ACCESS_WIFI_STATE
+        Permission.WifiChangeState -> Manifest.permission.CHANGE_WIFI_STATE
+
+        Permission.WifiNearbyDevices ->
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU)
+                Manifest.permission.NEARBY_WIFI_DEVICES
+            else
+                ""
     }
+
 }
 
 internal fun Permission.isAlwaysGranted(): Boolean =
@@ -185,6 +215,9 @@ internal fun getPermissionFromAndroidPermission(androidPermission: String): Perm
         Manifest.permission.BLUETOOTH_CONNECT -> Permission.BluetoothConnect
         Manifest.permission.BLUETOOTH_ADVERTISE -> Permission.BluetoothAdvertise
         Manifest.permission.READ_CONTACTS -> Permission.ReadContacts
+        Manifest.permission.ACCESS_WIFI_STATE -> Permission.WifiAccessState
+        Manifest.permission.CHANGE_WIFI_STATE -> Permission.WifiChangeState
+        Manifest.permission.NEARBY_WIFI_DEVICES -> Permission.WifiNearbyDevices
         else -> null
     }
 }

@@ -1,9 +1,7 @@
 package com.mohamedrejeb.calf.permissions
 
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.derivedStateOf
-import androidx.compose.runtime.getValue
+import androidx.compose.runtime.*
+import kotlinx.coroutines.CoroutineScope
 
 /**
  * Creates a [MultiplePermissionsState] that is remembered across compositions.
@@ -21,9 +19,51 @@ internal actual fun rememberMutableMultiplePermissionsState(
     permissions: List<Permission>,
     onPermissionsResult: (Map<Permission, Boolean>) -> Unit
 ): MultiplePermissionsState {
-    TODO()
+    val scope = rememberCoroutineScope()
+    val mutablePermissions = rememberMutablePermissionsState(permissions, scope, onPermissionsResult)
+    // Refresh permissions when the lifecycle is resumed.
+    PermissionsLifecycleCheckerEffect(mutablePermissions)
+    val permissionStates =
+        remember(permissions) {
+            MutableMultiplePermissionsState(
+                mutablePermissions = permissions.map {
+                    MutablePermissionStateImpl(
+                        permission = it,
+                        onPermissionResult = { isOk ->
+                            onPermissionsResult(mapOf(it to isOk))
+                        },
+                        scope = scope,
+                    )
+                }
+            )
+        }
+
+    return permissionStates
+
 }
 
+@ExperimentalPermissionsApi
+@Composable
+private fun rememberMutablePermissionsState(
+    permissions: List<Permission>,
+    scope: CoroutineScope,
+    onPermissionsResult: (Map<Permission, Boolean>) -> Unit
+): List<MutablePermissionState> {
+    // Create list of MutablePermissionState for each permission
+    val mutablePermissions = remember(permissions) {
+        return@remember permissions.map { permission ->
+            MutablePermissionStateImpl(
+                permission = permission,
+                scope = scope,
+                onPermissionResult = { isGranted ->
+                    onPermissionsResult(mapOf(permission to isGranted))
+                }
+            )
+        }
+    }
+
+    return mutablePermissions
+}
 
 /**
  * A state object that can be hoisted to control and observe multiple permission status changes.

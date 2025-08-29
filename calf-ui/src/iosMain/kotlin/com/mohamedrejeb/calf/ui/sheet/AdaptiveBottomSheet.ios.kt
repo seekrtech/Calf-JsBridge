@@ -20,7 +20,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.interop.LocalUIViewController
+import androidx.compose.ui.uikit.LocalUIViewController
 import androidx.compose.ui.unit.Dp
 import com.mohamedrejeb.calf.ui.utils.surfaceColorAtElevation
 
@@ -114,7 +114,10 @@ actual fun AdaptiveBottomSheet(
                 }
             )
         } else {
-            sheetManager.show(adaptiveSheetState.skipPartiallyExpanded)
+            sheetManager.show(
+                skipPartiallyExpanded = adaptiveSheetState.skipPartiallyExpanded,
+                showDragHandle = dragHandle != null,
+            )
         }
     }
 

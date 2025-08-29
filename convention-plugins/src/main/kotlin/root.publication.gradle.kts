@@ -2,7 +2,7 @@ import org.gradle.api.publish.PublishingExtension
 
 allprojects {
     group = "com.mohamedrejeb.calf"
-    version = System.getenv("VERSION") ?: "0.6.1-jsbridge"
+    version = System.getenv("VERSION") ?: "0.8.0-jsbridge"
 }
 
 // GitHub Packages publishing configuration for private repository

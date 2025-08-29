@@ -5,8 +5,8 @@ Changes have been made to add JSBridge support. Distributed under the terms of t
 
 Calf is a library that allows you to easily create adaptive UIs and access platform specific APIs from your Compose Multiplatform apps.
 
-[![Kotlin](https://img.shields.io/badge/kotlin-2.0.21-blue.svg?logo=kotlin)](http://kotlinlang.org)
-[![Compose](https://img.shields.io/badge/compose-1.7.0-blue.svg?logo=jetpackcompose)](https://www.jetbrains.com/lp/compose-multiplatform)
+[![Kotlin](https://img.shields.io/badge/kotlin-2.1.0-blue.svg?logo=kotlin)](http://kotlinlang.org)
+[![Compose](https://img.shields.io/badge/compose-1.7.3-blue.svg?logo=jetpackcompose)](https://www.jetbrains.com/lp/compose-multiplatform)
 [![MohamedRejeb](https://raw.githubusercontent.com/MohamedRejeb/MohamedRejeb/main/badges/mohamedrejeb.svg)](https://github.com/MohamedRejeb)
 [![Apache-2.0](https://img.shields.io/badge/License-Apache%202.0-green.svg)](https://opensource.org/licenses/Apache-2.0)
 [![BuildPassing](https://shields.io/badge/build-passing-brightgreen)](https://github.com/MohamedRejeb/ksoup/actions)
@@ -43,6 +43,9 @@ You can try the web demo [here](https://calf-library.netlify.app/)
 
 | Kotlin version | Compose version | Calf version |
 |----------------|-----------------|--------------|
+| 2.1.21         | 1.8.0           | 0.8.0        |
+| 2.1.10         | 1.7.3           | 0.7.1        |
+| 2.1.0          | 1.7.3           | 0.7.0        |
 | 2.0.21         | 1.7.0           | 0.6.1        |
 | 2.0.10         | 1.6.11          | 0.5.5        |
 | 1.9.22         | 1.6.0           | 0.4.1        |
