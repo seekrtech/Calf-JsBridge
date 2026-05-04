@@ -310,6 +310,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
+
         state.loadingState = LoadingState.Loading(0.0f)
         state.errorsForCurrentRequest.clear()
         state.pageTitle = null
@@ -320,8 +321,9 @@ public open class AccompanistWebViewClient : WebViewClient() {
 
     override fun onPageFinished(view: WebView, url: String?) {
         super.onPageFinished(view, url)
+
         state.loadingState = LoadingState.Finished
-        
+
         // Inject JavaScript bridge when page is finished loading
         webViewJsBridge?.let { bridge ->
             JsBridgeInjector.injectJsBridge(state, bridge)
@@ -434,6 +436,7 @@ public open class AccompanistWebChromeClient : WebChromeClient() {
     override fun onProgressChanged(view: WebView, newProgress: Int) {
         super.onProgressChanged(view, newProgress)
         if (state.loadingState is LoadingState.Finished) return
+
         state.loadingState = LoadingState.Loading(newProgress / 100.0f)
     }
 }

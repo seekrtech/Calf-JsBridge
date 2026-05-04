@@ -147,6 +147,7 @@ actual fun WebView(
                     WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
                     WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
                 }
+                allowsInlineMediaPlayback = iosSettings.allowsInlineMediaPlayback
             }
             WKWebView(
                 frame = CGRectZero.readValue(),
@@ -382,6 +383,8 @@ private fun WKWebView.applySettings(webSettings: WebSettings) {
         WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
         WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
     }
+
+    configuration.allowsInlineMediaPlayback = iosSettings.allowsInlineMediaPlayback
 
     if (respondsToSelector(sel_getUid("setInspectable:"))) {
         setInspectable(iosSettings.isInspectable)

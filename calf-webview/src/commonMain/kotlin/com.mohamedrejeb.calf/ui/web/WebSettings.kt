@@ -148,6 +148,12 @@ class WebSettings internal constructor(
                 onSettingsChanged()
             }
 
+        var allowsInlineMediaPlayback = false
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
         var isInspectable = false
             set(value) {
                 field = value
