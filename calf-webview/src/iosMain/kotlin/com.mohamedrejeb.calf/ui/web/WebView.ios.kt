@@ -1,8 +1,16 @@
 package com.mohamedrejeb.calf.ui.web
 
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.mapSaver
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.UIKitInteropInteractionMode
@@ -11,17 +19,39 @@ import androidx.compose.ui.viewinterop.UIKitView
 import kotlinx.cinterop.BetaInteropApi
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.ObjCSignatureOverride
+import kotlinx.cinterop.readValue
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
-import platform.Foundation.NSString
-import platform.Foundation.create
-import platform.Foundation.setValue
-import platform.Foundation.dataUsingEncoding
-import platform.Foundation.NSURL
+import platform.CoreGraphics.CGRectZero
+import platform.Foundation.HTTPMethod
+import platform.Foundation.NSError
 import platform.Foundation.NSMutableURLRequest
+import platform.Foundation.NSString
+import platform.Foundation.NSURL
 import platform.Foundation.NSUTF8StringEncoding
-import platform.WebKit.*
+import platform.Foundation.allHTTPHeaderFields
+import platform.Foundation.create
+import platform.Foundation.dataUsingEncoding
+import platform.Foundation.setValue
+import platform.UIKit.UIScrollViewContentInsetAdjustmentBehavior
+import platform.WebKit.WKAudiovisualMediaTypeAll
+import platform.WebKit.WKAudiovisualMediaTypeAudio
+import platform.WebKit.WKAudiovisualMediaTypeNone
+import platform.WebKit.WKAudiovisualMediaTypeVideo
+import platform.WebKit.WKContentMode
+import platform.WebKit.WKNavigation
+import platform.WebKit.WKNavigationAction
+import platform.WebKit.WKNavigationActionPolicy
+import platform.WebKit.WKNavigationDelegateProtocol
+import platform.WebKit.WKWebView
+import platform.WebKit.WKWebViewConfiguration
+import platform.WebKit.javaScriptEnabled
 import platform.darwin.NSObject
+import platform.darwin.sel_getUid
+import kotlin.time.Duration
+
+actual typealias PlatformWebView = WKWebView
 
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
@@ -49,10 +79,13 @@ import platform.darwin.NSObject
 actual fun WebView(
     state: WebViewState,
     modifier: Modifier,
+    alpha: Float,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
-    onCreated: () -> Unit,
-    onDispose: () -> Unit,
+    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge?,
+    loadContentDelay: Duration,
+    onCreated: (PlatformWebView) -> Unit,
+    onDispose: (PlatformWebView) -> Unit,
 ) {
     val webView = state.webView
 
@@ -63,6 +96,7 @@ actual fun WebView(
 
         LaunchedEffect(wv, state) {
             snapshotFlow { state.content }.collect { content ->
+                delay(loadContentDelay)
                 when (content) {
                     is WebContent.Url -> {
                         val url = NSURL(string = content.url)
@@ -72,7 +106,6 @@ actual fun WebView(
                             urlRequest.setValue(value = value, forHTTPHeaderField = key)
                         }
                         wv.loadRequest(urlRequest)
-                        wv.allowsBackForwardNavigationGestures = true
                     }
 
                     is WebContent.Data -> {
@@ -96,20 +129,59 @@ actual fun WebView(
 
     UIKitView(
         factory = {
-            WKWebView().apply {
-                onCreated()
-                setUserInteractionEnabled(captureBackPresses)
-                applySettings(state.settings)
-                state.webView = this
-                navigationDelegate = state
+            val config = WKWebViewConfiguration().apply {
+                val webSettings = state.settings
+                defaultWebpagePreferences.allowsContentJavaScript = webSettings.javaScriptEnabled
+                preferences.javaScriptEnabled = webSettings.javaScriptEnabled
+                preferences.javaScriptCanOpenWindowsAutomatically = webSettings.javaScriptCanOpenWindowsAutomatically
+
+                // Configure viewport and content sizing settings similar to Android
+                defaultWebpagePreferences.preferredContentMode = WKContentMode.WKContentModeRecommended
+
+                // Apply iOS-specific settings
+                val iosSettings = webSettings.iosSettings
+
+                mediaTypesRequiringUserActionForPlayback = when (iosSettings.mediaTypesRequiringUserActionForPlayback) {
+                    WebSettings.IosSettings.AudiovisualMediaType.None -> WKAudiovisualMediaTypeNone
+                    WebSettings.IosSettings.AudiovisualMediaType.Audio -> WKAudiovisualMediaTypeAudio
+                    WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
+                    WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
+                }
+                allowsInlineMediaPlayback = iosSettings.allowsInlineMediaPlayback
             }
+            WKWebView(
+                frame = CGRectZero.readValue(),
+                configuration = config,
+            ).apply {
+                setAlpha(alpha.toDouble())
+                // Configure back/forward gesture handling separately
+                allowsBackForwardNavigationGestures = captureBackPresses
+
+                applySettings(state.settings)
+                
+                // Setup JavaScript bridge if provided
+                webViewJsBridge?.let { bridge ->
+                    val iosHandler = com.mohamedrejeb.calf.ui.web.jsbridge.IOSJsBridgeHandler(bridge)
+                    configuration.userContentController.addScriptMessageHandler(iosHandler, "iosJsBridge")
+                    bridge.webViewState = state
+                    state.webViewJsBridge = bridge
+                }
+                
+                state.webView = this
+                state.navigator = navigator
+                navigationDelegate = state
+                onCreated(this)
+            }
+        },
+        update = {
+            it.setAlpha(alpha.toDouble())
         },
         properties = UIKitInteropProperties(
             interactionMode = UIKitInteropInteractionMode.NonCooperative,
         ),
         onRelease = {
-            onDispose()
             state.webView = null
+            onDispose(it)
         },
         modifier = modifier,
     )
@@ -123,6 +195,9 @@ actual fun WebView(
 actual class WebViewState actual constructor(
     webContent: WebContent
 ): NSObject(), WKNavigationDelegateProtocol {
+    
+    internal var webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null
+    internal var navigator: WebViewNavigator? = null
     actual var lastLoadedUrl: String? by mutableStateOf(null)
         internal set
 
@@ -143,6 +218,8 @@ actual class WebViewState actual constructor(
      */
     actual val isLoading: Boolean
         get() = loadingState !is LoadingState.Finished
+
+    actual val errorsForCurrentRequest: SnapshotStateList<WebViewError> = mutableStateListOf()
 
     /**
      * The title received from the loaded content of the current page
@@ -175,10 +252,55 @@ actual class WebViewState actual constructor(
     var webView by mutableStateOf<WKWebView?>(null)
         internal set
 
+    /**
+     * Called when the web view begins to receive web content.
+     */
+    @ObjCSignatureOverride
+    override fun webView(
+        webView: WKWebView,
+        didStartProvisionalNavigation: WKNavigation?,
+    ) {
+        errorsForCurrentRequest.clear()
+        loadingState = LoadingState.Loading(0.0f)
+    }
+
+
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
     @ObjCSignatureOverride
     override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
         loadingState = LoadingState.Finished
+
+        // Inject JavaScript bridge when page is finished loading
+        webViewJsBridge?.let { bridge ->
+            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(this, bridge)
+            
+            // Inject iOS-specific bridge connection
+            val iosScript = """
+                window.${bridge.jsBridgeName}.postMessage = function (message) {
+                    window.webkit.messageHandlers.iosJsBridge.postMessage(message);
+                };
+            """.trimIndent()
+            
+            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(this, bridge, iosScript)
+        }
+    }
+
+    /**
+     * Called when the web view fails to load content.
+     */
+    override fun webView(
+        webView: WKWebView,
+        didFailProvisionalNavigation: WKNavigation?,
+        withError: NSError,
+    ) {
+        errorsForCurrentRequest.add(
+            WebViewError(
+                code = withError.code.toInt(),
+                description = withError.localizedDescription,
+                // on iOS all errors are from the main frame
+                isFromMainFrame = true,
+            ),
+        )
     }
 
     @Suppress("PARAMETER_NAME_CHANGED_ON_OVERRIDE")
@@ -186,12 +308,99 @@ actual class WebViewState actual constructor(
     override fun webView(webView: WKWebView, didCommitNavigation: WKNavigation?) {
         loadingState = LoadingState.Loading(webView.estimatedProgress.toFloat())
     }
+
+    private var isRedirect = false
+
+    @OptIn(ExperimentalForeignApi::class)
+    override fun webView(
+        webView: WKWebView,
+        decidePolicyForNavigationAction: WKNavigationAction,
+        decisionHandler: (WKNavigationActionPolicy) -> Unit
+    ) {
+        val url = decidePolicyForNavigationAction.request.URL?.absoluteString
+        
+        // Intercept ALL navigation requests (including target="_blank") when interceptor is available
+        if (url != null && !isRedirect && navigator?.requestInterceptor != null) {
+            navigator?.requestInterceptor?.apply {
+                val request = decidePolicyForNavigationAction.request
+                val headerMap = mutableMapOf<String, String>()
+                request.allHTTPHeaderFields?.forEach {
+                    headerMap[it.key.toString()] = it.value.toString()
+                }
+                
+                // Determine target type based on frame information
+                val isMainFrame = decidePolicyForNavigationAction.targetFrame?.mainFrame ?: false
+                
+                val webRequest = com.mohamedrejeb.calf.ui.web.request.WebRequest(
+                    url = request.URL?.absoluteString ?: "",
+                    headers = headerMap,
+                    isForMainFrame = isMainFrame,
+                    isRedirect = isRedirect,
+                    method = request.HTTPMethod ?: "GET"
+                )
+                
+                val interceptResult = this.onInterceptUrlRequest(webRequest, navigator!!)
+                
+                when (interceptResult) {
+                    is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Allow -> {
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyAllow)
+                    }
+                    is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Reject -> {
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
+                    }
+                    is com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult.Modify -> {
+                        isRedirect = true
+                        interceptResult.request.apply {
+                            navigator!!.stopLoading()
+                            navigator!!.loadUrl(this.url, this.headers)
+                        }
+                        decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyCancel)
+                    }
+                }
+            }
+        } else {
+            isRedirect = false
+            decisionHandler(WKNavigationActionPolicy.WKNavigationActionPolicyAllow)
+        }
+    }
 }
 
+@OptIn(ExperimentalForeignApi::class)
 private fun WKWebView.applySettings(webSettings: WebSettings) {
     configuration.defaultWebpagePreferences.allowsContentJavaScript = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptEnabled = webSettings.javaScriptEnabled
     configuration.preferences.javaScriptCanOpenWindowsAutomatically = webSettings.javaScriptCanOpenWindowsAutomatically
+
+    // Configure viewport and content sizing settings similar to Android
+    configuration.defaultWebpagePreferences.preferredContentMode = WKContentMode.WKContentModeRecommended
+
+    // Apply iOS-specific settings
+    val iosSettings = webSettings.iosSettings
+
+    configuration.mediaTypesRequiringUserActionForPlayback = when (iosSettings.mediaTypesRequiringUserActionForPlayback) {
+        WebSettings.IosSettings.AudiovisualMediaType.None -> WKAudiovisualMediaTypeNone
+        WebSettings.IosSettings.AudiovisualMediaType.Audio -> WKAudiovisualMediaTypeAudio
+        WebSettings.IosSettings.AudiovisualMediaType.Video -> WKAudiovisualMediaTypeVideo
+        WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
+    }
+
+    // allowsInlineMediaPlayback is read-only after WKWebView init; runtime update has no effect
+
+    if (respondsToSelector(sel_getUid("setInspectable:"))) {
+        setInspectable(iosSettings.isInspectable)
+    }
+    opaque = iosSettings.isOpaque
+
+    scrollView.bounces = iosSettings.bounces
+    scrollView.minimumZoomScale = iosSettings.minimumZoomScale
+    scrollView.maximumZoomScale = iosSettings.maximumZoomScale
+    scrollView.zoomScale = iosSettings.zoomScale
+    scrollView.contentInsetAdjustmentBehavior = when (iosSettings.contentInsetAdjustmentBehavior) {
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.Never -> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentNever
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.ScrollableAxes-> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentScrollableAxes
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.Always -> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentAlways
+        WebSettings.IosSettings.ScrollViewContentInsetAdjustment.Automatic -> UIScrollViewContentInsetAdjustmentBehavior.UIScrollViewContentInsetAdjustmentAutomatic
+    }
 }
 
 // Use Dispatchers.Main to ensure that the webview methods are called on UI thread
@@ -222,7 +431,13 @@ internal suspend fun WebViewNavigator.handleNavigationEvents(
             }
 
             is WebViewNavigator.NavigationEvent.LoadUrl -> {
-                loadUrl(event.url, event.additionalHttpHeaders)
+                val url = NSURL(string = event.url)
+                val urlRequest = NSMutableURLRequest()
+                urlRequest.setURL(url)
+                event.additionalHttpHeaders.forEach { (key, value) ->
+                    urlRequest.setValue(value = value, forHTTPHeaderField = key)
+                }
+                webView.loadRequest(urlRequest)
             }
         }
     }

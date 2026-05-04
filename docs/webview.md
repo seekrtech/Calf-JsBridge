@@ -7,12 +7,12 @@
 Add the following dependency to your module `build.gradle.kts` file:
 
 ```kotlin
-implementation("com.mohamedrejeb.calf:calf-webview:0.6.1")
+implementation("com.mohamedrejeb.calf:calf-webview:0.8.0")
 ```
 
 ## Usage
 
-`WebView` is a view that adapts to the platform it is running on. It is a wrapper around `WebView` on Android, `WKWebView` on iOS and JavaFX `WebView` on Desktop.
+`WebView` is a view that adapts to the platform it is running on. It is a wrapper around `WebView` on Android and `WKWebView` on iOS.
 
 | Android                                         | iOS                                     |
 |-------------------------------------------------|-----------------------------------------|

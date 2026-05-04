@@ -17,14 +17,12 @@ class WebSettings internal constructor(
 
     val androidSettings = AndroidSettings(onSettingsChanged)
 
-    val iosSettings = IosSettings()
-
-    val desktopSettings = DesktopSettings()
+    val iosSettings = IosSettings(onSettingsChanged)
 
     class AndroidSettings internal constructor(
         private val onSettingsChanged: () -> Unit
     ) {
-        var supportZoom = true
+        var supportZoom = false
             set(value) {
                 field = value
                 onSettingsChanged()
@@ -131,10 +129,71 @@ class WebSettings internal constructor(
                 field = value
                 onSettingsChanged()
             }
-
     }
 
-    class IosSettings
+    class IosSettings internal constructor(
+        private val onSettingsChanged: () -> Unit
+    ) {
+        enum class AudiovisualMediaType {
+            None, Audio, Video, All
+        }
 
-    class DesktopSettings
+        enum class ScrollViewContentInsetAdjustment {
+            Never, ScrollableAxes, Always, Automatic
+        }
+
+        var mediaTypesRequiringUserActionForPlayback = AudiovisualMediaType.None
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var allowsInlineMediaPlayback = false
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var isInspectable = false
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var isOpaque = true
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var bounces: Boolean = true
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var minimumZoomScale = 1.0
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var maximumZoomScale = 1.0
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var zoomScale = 1.0
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+
+        var contentInsetAdjustmentBehavior = ScrollViewContentInsetAdjustment.Never
+            set(value) {
+                field = value
+                onSettingsChanged()
+            }
+    }
 }

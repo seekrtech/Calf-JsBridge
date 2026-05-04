@@ -9,10 +9,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import com.mohamedrejeb.calf.ui.web.LoadingState.Finished
+import com.mohamedrejeb.calf.ui.web.LoadingState.Loading
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+expect class PlatformWebView
 
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
@@ -39,10 +46,13 @@ import kotlinx.coroutines.launch
 expect fun WebView(
     state: WebViewState,
     modifier: Modifier = Modifier,
+    alpha: Float = 1F,
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
-    onCreated: () -> Unit = {},
-    onDispose: () -> Unit = {},
+    webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null,
+    loadContentDelay: Duration = 0.milliseconds,
+    onCreated: (PlatformWebView) -> Unit = {},
+    onDispose: (PlatformWebView) -> Unit = {},
 )
 
 public sealed class WebContent {
@@ -116,6 +126,13 @@ expect class WebViewState(webContent: WebContent) {
     public val isLoading: Boolean
 
     /**
+     * A list for errors captured in the last load. Reset when a new page is loaded.
+     * Errors could be from any resource (iframe, image, etc.), not just for the main page.
+     * To filter for only main frame errors, use [WebViewError.isFromMainFrame].
+     */
+    public val errorsForCurrentRequest: SnapshotStateList<WebViewError>
+
+    /**
      * The title received from the loaded content of the current page
      */
     public var pageTitle: String?
@@ -133,7 +150,10 @@ expect class WebViewState(webContent: WebContent) {
  * @see [rememberWebViewNavigator]
  */
 @Stable
-public class WebViewNavigator(private val coroutineScope: CoroutineScope) {
+public class WebViewNavigator(
+    private val coroutineScope: CoroutineScope,
+    public val requestInterceptor: com.mohamedrejeb.calf.ui.web.request.RequestInterceptor? = null
+) {
     internal sealed interface NavigationEvent {
         data object Back : NavigationEvent
         data object Forward : NavigationEvent
@@ -234,8 +254,9 @@ public class WebViewNavigator(private val coroutineScope: CoroutineScope) {
  */
 @Composable
 public fun rememberWebViewNavigator(
-    coroutineScope: CoroutineScope = rememberCoroutineScope()
-): WebViewNavigator = remember(coroutineScope) { WebViewNavigator(coroutineScope) }
+    coroutineScope: CoroutineScope = rememberCoroutineScope(),
+    requestInterceptor: com.mohamedrejeb.calf.ui.web.request.RequestInterceptor? = null
+): WebViewNavigator = remember(coroutineScope, requestInterceptor) { WebViewNavigator(coroutineScope, requestInterceptor) }
 
 /**
  * Creates a WebView state that is remembered across Compositions.

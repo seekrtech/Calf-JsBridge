@@ -1,27 +1,29 @@
 [versions]
 agp = "8.5.2"
-kotlin = "2.0.21"
-compose = "1.7.0"
-kotlinx-datetime = "0.6.1"
+kotlin = "2.2.0"
+compose = "1.8.2"
+kotlinx-datetime = "0.6.2"
+kotlinx-browser = "0.3"
+kotlinx-serialization-json = "1.6.0"
+documentfile = "1.1.0"
+jna = "5.17.0"
+coil = "3.2.0"
 nexus-publish = "2.0.0"
-documentfile = "1.0.1"
-jna = "5.14.0"
-coil = "3.0.1"
 
-calf = "0.5.5"
+calf = "0.8.0-jsbridge"
 
 # For sample
-activity-compose = "1.9.3"
-navigation-compose = "2.8.3"
+activity-compose = "1.10.1"
+navigation-compose = "2.9.0"
 android-minSdk = "21"
-android-compileSdk = "34"
-kotlinx-coroutines = "1.9.0"
-appcompat = "1.7.0"
-compose-ui = "1.7.1"
+android-compileSdk = "35"
+kotlinx-coroutines = "1.10.2"
+appcompat = "1.7.1"
+compose-ui = "1.8.3"
 android-lifecycle = "2.2.0"
 play-services-location = "21.3.0"
-compose-navigation = "2.7.0-alpha07"
-ktor = "3.0.1"
+compose-navigation = "2.9.0-beta03"
+ktor = "3.2.2"
 
 [libraries]
 gradlePlugin-android = { module = "com.android.tools.build:gradle", version.ref = "agp" }
@@ -41,7 +43,7 @@ kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutine
 kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-javafx = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-javafx", version.ref = "kotlinx-coroutines" }
 kotlinx-datetime = { module = "org.jetbrains.kotlinx:kotlinx-datetime", version.ref = "kotlinx-datetime" }
-nexus-publish = { module = "io.github.gradle-nexus.publish-plugin:io.github.gradle-nexus.publish-plugin.gradle.plugin", version.ref = "nexus-publish" }
+kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 
 coil = { module = "io.coil-kt.coil3:coil", version.ref = "coil" }
 
@@ -50,6 +52,9 @@ documentfile = { module = "androidx.documentfile:documentfile", version.ref = "d
 
 # Desktop
 jna = { module = "net.java.dev.jna:jna", version.ref = "jna" }
+
+# Wasm
+kotlinx-browser = { module = "org.jetbrains.kotlinx:kotlinx-browser", version.ref = "kotlinx-browser" }
 
 # For sample
 navigation-compose = { module = "androidx.navigation:navigation-compose", version.ref = "navigation-compose" }

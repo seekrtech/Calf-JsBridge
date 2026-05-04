@@ -31,9 +31,9 @@ kotlin {
         implementation(projects.calfFilePicker)
         implementation(projects.calfFilePickerCoil)
         implementation(projects.calfPermissions)
-        implementation(projects.calfWebview)
         implementation(libs.compose.navigation)
         implementation(projects.calfNavigation)
+        implementation(projects.calfCameraPicker)
 
         // Coil
         implementation(libs.coil.compose)
@@ -46,6 +46,7 @@ kotlin {
     sourceSets.androidMain.dependencies {
         implementation(libs.kotlinx.coroutines.android)
         implementation(libs.ktor.client.okhttp)
+        implementation(projects.calfWebview)
     }
 
     sourceSets.desktopMain.dependencies {
@@ -57,13 +58,10 @@ kotlin {
 
     sourceSets.iosMain.dependencies {
         implementation(libs.ktor.client.darwin)
+        implementation(projects.calfWebview)
     }
 
     sourceSets.jsMain.dependencies {
         implementation(libs.ktor.client.js)
-    }
-
-    sourceSets.wasmJsMain.dependencies {
-        implementation(libs.ktor.client.wasm)
     }
 }

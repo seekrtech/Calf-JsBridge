@@ -10,13 +10,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import com.mohamedrejeb.calf.sample.navigation.Screen
-import com.mohamedrejeb.calf.ui.web.WebView
-import com.mohamedrejeb.calf.ui.web.rememberWebViewState
+import androidx.compose.ui.unit.dp
+import com.mohamedrejeb.calf.sample.Platform
+import com.mohamedrejeb.calf.sample.currentPlatform
+
+@Composable
+expect fun WebViewScreen(
+    navigateBack: () -> Unit
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun WebViewScreen(
+internal fun WebViewNotSupportedScreen(
     navigateBack: () -> Unit
 ) {
 
@@ -54,41 +59,37 @@ fun WebViewScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
-                .background(MaterialTheme.colorScheme.background)
+                .background(MaterialTheme.colorScheme.background),
+            contentAlignment = Alignment.Center
         ) {
-            val state = rememberWebViewState(
-                url = "https://github.com/MohamedRejeb"
-            )
-
-            LaunchedEffect(state.isLoading) {
-                if (state.isLoading) return@LaunchedEffect
-
-                state.settings.apply {
-                    javaScriptEnabled = true
-                    androidSettings.supportZoom = true
-                }
-
-                state.evaluateJavascript(
-                    """
-                        "Hello World!";
-                    """.trimIndent()
-                ) {
-                    println("JS Response: $it")
-                }
-            }
-
-            WebView(
-                state = state,
-                modifier = Modifier
-                    .fillMaxSize()
-            )
-
-            if (state.isLoading)
-                LinearProgressIndicator(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .align(Alignment.TopCenter)
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(32.dp)
+            ) {
+                Icon(
+                    Icons.Filled.Web,
+                    contentDescription = null,
+                    modifier = Modifier.size(64.dp),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "WebView Not Available",
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "WebView is not supported on ${currentPlatform.name} platform",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    textAlign = TextAlign.Center
+                )
+            }
         }
     }
 }

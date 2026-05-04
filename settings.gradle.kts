@@ -22,7 +22,7 @@ dependencyResolutionManagement {
 }
 
 plugins {
-    id("org.gradle.toolchains.foojay-resolver-convention") version "0.5.0"
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
 }
 
 include(
@@ -42,8 +42,8 @@ include(
     ":sample:android",
     ":sample:desktop",
     ":sample:web-js",
-    ":sample:web-wasm",
     ":sample:common",
+    "calf-camera-picker",
 )
 
 enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
