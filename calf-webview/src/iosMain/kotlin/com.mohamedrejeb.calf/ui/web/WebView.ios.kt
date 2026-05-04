@@ -170,7 +170,6 @@ actual fun WebView(
                 state.webView = this
                 state.navigator = navigator
                 navigationDelegate = state
-
                 onCreated(this)
             }
         },
@@ -262,6 +261,7 @@ actual class WebViewState actual constructor(
         didStartProvisionalNavigation: WKNavigation?,
     ) {
         errorsForCurrentRequest.clear()
+        loadingState = LoadingState.Loading(0.0f)
     }
 
 
@@ -269,7 +269,7 @@ actual class WebViewState actual constructor(
     @ObjCSignatureOverride
     override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
         loadingState = LoadingState.Finished
-        
+
         // Inject JavaScript bridge when page is finished loading
         webViewJsBridge?.let { bridge ->
             com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(this, bridge)
@@ -384,7 +384,7 @@ private fun WKWebView.applySettings(webSettings: WebSettings) {
         WebSettings.IosSettings.AudiovisualMediaType.All -> WKAudiovisualMediaTypeAll
     }
 
-    configuration.allowsInlineMediaPlayback = iosSettings.allowsInlineMediaPlayback
+    // allowsInlineMediaPlayback is read-only after WKWebView init; runtime update has no effect
 
     if (respondsToSelector(sel_getUid("setInspectable:"))) {
         setInspectable(iosSettings.isInspectable)
