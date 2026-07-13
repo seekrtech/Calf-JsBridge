@@ -121,6 +121,14 @@ expect class WebViewState(webContent: WebContent) {
         internal set
 
     /**
+     * Whether the DOM content of the currently loaded document has finished loading.
+     * Sticky per document: reset to `false` at navigation start, set to `true` when the
+     * DOM-ready sentinel arrives.
+     */
+    public var domContentLoaded: Boolean
+        internal set
+
+    /**
      * Whether the webview is currently loading data in its main frame
      */
     public val isLoading: Boolean

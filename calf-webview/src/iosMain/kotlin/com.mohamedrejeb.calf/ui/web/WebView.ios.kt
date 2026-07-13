@@ -214,6 +214,14 @@ actual class WebViewState actual constructor(
         internal set
 
     /**
+     * Whether the DOM content of the currently loaded document has finished loading.
+     * Sticky per document: reset to `false` at navigation start, set to `true` when the
+     * DOM-ready sentinel arrives.
+     */
+    actual var domContentLoaded: Boolean by mutableStateOf(false)
+        internal set
+
+    /**
      * Whether the webview is currently loading data in its main frame
      */
     actual val isLoading: Boolean
@@ -262,6 +270,7 @@ actual class WebViewState actual constructor(
     ) {
         errorsForCurrentRequest.clear()
         loadingState = LoadingState.Loading(0.0f)
+        domContentLoaded = false
     }
 
 

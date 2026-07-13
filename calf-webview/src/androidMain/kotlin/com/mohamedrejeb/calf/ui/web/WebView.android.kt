@@ -312,6 +312,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
         super.onPageStarted(view, url, favicon)
 
         state.loadingState = LoadingState.Loading(0.0f)
+        state.domContentLoaded = false
         state.errorsForCurrentRequest.clear()
         state.pageTitle = null
         state.pageIcon = null
@@ -460,6 +461,14 @@ actual class WebViewState actual constructor(webContent: WebContent) {
      * progress) or the data loading has [LoadingState.Finished]. See [LoadingState]
      */
     actual var loadingState: LoadingState by mutableStateOf(LoadingState.Initializing)
+        internal set
+
+    /**
+     * Whether the DOM content of the currently loaded document has finished loading.
+     * Sticky per document: reset to `false` at navigation start, set to `true` when the
+     * DOM-ready sentinel arrives.
+     */
+    actual var domContentLoaded: Boolean by mutableStateOf(false)
         internal set
 
     /**
