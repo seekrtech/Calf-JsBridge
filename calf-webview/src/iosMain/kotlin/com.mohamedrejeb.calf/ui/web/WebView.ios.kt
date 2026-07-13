@@ -44,6 +44,11 @@ import platform.WebKit.WKNavigation
 import platform.WebKit.WKNavigationAction
 import platform.WebKit.WKNavigationActionPolicy
 import platform.WebKit.WKNavigationDelegateProtocol
+import platform.WebKit.WKScriptMessage
+import platform.WebKit.WKScriptMessageHandlerProtocol
+import platform.WebKit.WKUserContentController
+import platform.WebKit.WKUserScript
+import platform.WebKit.WKUserScriptInjectionTime
 import platform.WebKit.WKWebView
 import platform.WebKit.WKWebViewConfiguration
 import platform.WebKit.javaScriptEnabled
@@ -158,7 +163,20 @@ actual fun WebView(
                 allowsBackForwardNavigationGestures = captureBackPresses
 
                 applySettings(state.settings)
-                
+
+                // Signal DOMContentLoaded regardless of whether a JS bridge is provided
+                configuration.userContentController.addScriptMessageHandler(
+                    DomContentLoadedMessageHandler(state),
+                    "iosDomLoaded",
+                )
+                configuration.userContentController.addUserScript(
+                    WKUserScript(
+                        source = DOM_CONTENT_LOADED_SCRIPT,
+                        injectionTime = WKUserScriptInjectionTime.WKUserScriptInjectionTimeAtDocumentStart,
+                        forMainFrameOnly = true,
+                    ),
+                )
+
                 // Setup JavaScript bridge if provided
                 webViewJsBridge?.let { bridge ->
                     val iosHandler = com.mohamedrejeb.calf.ui.web.jsbridge.IOSJsBridgeHandler(bridge)
@@ -166,7 +184,7 @@ actual fun WebView(
                     bridge.webViewState = state
                     state.webViewJsBridge = bridge
                 }
-                
+
                 state.webView = this
                 state.navigator = navigator
                 navigationDelegate = state
@@ -185,6 +203,31 @@ actual fun WebView(
         },
         modifier = modifier,
     )
+}
+
+private const val DOM_CONTENT_LOADED_SCRIPT = """
+(function () {
+  function post() {
+    try { window.webkit.messageHandlers.iosDomLoaded.postMessage("domReady"); } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', post);
+  } else {
+    post();
+  }
+})();
+"""
+
+private class DomContentLoadedMessageHandler(
+    private val webViewState: WebViewState,
+) : NSObject(), WKScriptMessageHandlerProtocol {
+    override fun userContentController(
+        userContentController: WKUserContentController,
+        didReceiveScriptMessage: WKScriptMessage,
+    ) {
+        // WKScriptMessageHandler callbacks are delivered on the main thread.
+        webViewState.domContentLoaded = true
+    }
 }
 
 /**
