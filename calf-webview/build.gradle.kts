@@ -39,5 +39,6 @@ kotlin {
     sourceSets.androidMain.dependencies {
         implementation(libs.activity.compose)
         implementation(libs.kotlinx.coroutines.android)
+        implementation(libs.androidx.webkit)
     }
 }

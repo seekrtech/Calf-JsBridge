@@ -31,7 +31,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.mohamedrejeb.calf.ui.web.jsbridge.AndroidJsBridgeInterface
+import com.mohamedrejeb.calf.ui.web.jsbridge.DomContentLoadedInterface
 import com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector
 import com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge
 import com.mohamedrejeb.calf.ui.web.request.WebRequest
@@ -43,6 +46,19 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 
 actual typealias PlatformWebView = WebView
+
+private const val DOM_CONTENT_LOADED_SCRIPT = """
+(function () {
+  function post() {
+    try { window.androidDomLoaded.onDomContentLoaded(); } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', post);
+  } else {
+    post();
+  }
+})();
+"""
 
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
@@ -249,6 +265,13 @@ internal fun WebView(
                 webViewJsBridge?.let { bridge ->
                     val androidInterface = AndroidJsBridgeInterface(bridge)
                     addJavascriptInterface(androidInterface, "androidJsBridge")
+                }
+
+                // Register the DOM-ready signal unconditionally, independent of whether
+                // a JS bridge was provided.
+                addJavascriptInterface(DomContentLoadedInterface(state), "androidDomLoaded")
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(this, DOM_CONTENT_LOADED_SCRIPT, setOf("*"))
                 }
 
                 webChromeClient = chromeClient
