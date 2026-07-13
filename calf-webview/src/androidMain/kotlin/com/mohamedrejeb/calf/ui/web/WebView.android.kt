@@ -49,6 +49,7 @@ actual typealias PlatformWebView = WebView
 
 private const val DOM_CONTENT_LOADED_SCRIPT = """
 (function () {
+  if (window.top !== window.self) return; // main frame only, parity with iOS forMainFrameOnly
   function post() {
     try { window.androidDomLoaded.onDomContentLoaded(); } catch (e) {}
   }
