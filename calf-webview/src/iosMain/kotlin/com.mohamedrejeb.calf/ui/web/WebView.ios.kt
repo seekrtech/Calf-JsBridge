@@ -226,6 +226,10 @@ private class DomContentLoadedMessageHandler(
         didReceiveScriptMessage: WKScriptMessage,
     ) {
         // WKScriptMessageHandler callbacks are delivered on the main thread.
+        // Inject the calf JS bridge now (at DOMContentLoaded, before didFinishNavigation which
+        // may never fire) so plugins injected at DOM-ready have window.<jsBridgeName> available;
+        // then flip the DOM-ready flag.
+        webViewState.injectBridgeIfNeeded()
         webViewState.domContentLoaded = true
     }
 }
@@ -241,6 +245,9 @@ actual class WebViewState actual constructor(
     
     internal var webViewJsBridge: com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge? = null
     internal var navigator: WebViewNavigator? = null
+
+    // Guards one-per-document calf JS-bridge injection (see injectBridgeIfNeeded).
+    private var bridgeInjected: Boolean = false
     actual var lastLoadedUrl: String? by mutableStateOf(null)
         internal set
 
@@ -314,6 +321,7 @@ actual class WebViewState actual constructor(
         errorsForCurrentRequest.clear()
         loadingState = LoadingState.Loading(0.0f)
         domContentLoaded = false
+        bridgeInjected = false
     }
 
 
@@ -322,19 +330,31 @@ actual class WebViewState actual constructor(
     override fun webView(webView: WKWebView, didFinishNavigation: WKNavigation?) {
         loadingState = LoadingState.Finished
 
-        // Inject JavaScript bridge when page is finished loading
-        webViewJsBridge?.let { bridge ->
-            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(this, bridge)
-            
-            // Inject iOS-specific bridge connection
-            val iosScript = """
-                window.${bridge.jsBridgeName}.postMessage = function (message) {
-                    window.webkit.messageHandlers.iosJsBridge.postMessage(message);
-                };
-            """.trimIndent()
-            
-            com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(this, bridge, iosScript)
-        }
+        // Fallback injection if the DOM-ready path didn't already inject (idempotent).
+        injectBridgeIfNeeded()
+    }
+
+    /**
+     * Injects the calf JS bridge (window.<jsBridgeName>) into the current document, once per
+     * document. Called both at DOMContentLoaded (so the bridge exists before Finished — which may
+     * never fire) and at didFinishNavigation as a fallback. The bridgeInjected guard is reset at
+     * navigation start, so each document gets exactly one injection.
+     */
+    internal fun injectBridgeIfNeeded() {
+        if (bridgeInjected) return
+        val bridge = webViewJsBridge ?: return
+        bridgeInjected = true
+
+        com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectJsBridge(this, bridge)
+
+        // Inject iOS-specific bridge connection
+        val iosScript = """
+            window.${bridge.jsBridgeName}.postMessage = function (message) {
+                window.webkit.messageHandlers.iosJsBridge.postMessage(message);
+            };
+        """.trimIndent()
+
+        com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.injectPlatformBridge(this, bridge, iosScript)
     }
 
     /**

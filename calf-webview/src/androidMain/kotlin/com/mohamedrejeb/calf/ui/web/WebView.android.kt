@@ -269,8 +269,12 @@ internal fun WebView(
                 }
 
                 // Register the DOM-ready signal unconditionally, independent of whether
-                // a JS bridge was provided.
-                addJavascriptInterface(DomContentLoadedInterface(state), "androidDomLoaded")
+                // a JS bridge was provided. On DOM-ready it also injects the calf JS bridge so
+                // window.<jsBridgeName> exists before onPageFinished (which may never fire).
+                addJavascriptInterface(
+                    DomContentLoadedInterface(state) { client.injectBridgeIfNeeded() },
+                    "androidDomLoaded",
+                )
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                     WebViewCompat.addDocumentStartJavaScript(this, DOM_CONTENT_LOADED_SCRIPT, setOf("*"))
                 }
@@ -332,11 +336,15 @@ public open class AccompanistWebViewClient : WebViewClient() {
     public open var webViewJsBridge: WebViewJsBridge? = null
         internal set
 
+    // Guards one-per-document calf JS-bridge injection (see injectBridgeIfNeeded).
+    private var bridgeInjected: Boolean = false
+
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
 
         state.loadingState = LoadingState.Loading(0.0f)
         state.domContentLoaded = false
+        bridgeInjected = false
         state.errorsForCurrentRequest.clear()
         state.pageTitle = null
         state.pageIcon = null
@@ -349,19 +357,31 @@ public open class AccompanistWebViewClient : WebViewClient() {
 
         state.loadingState = LoadingState.Finished
 
-        // Inject JavaScript bridge when page is finished loading
-        webViewJsBridge?.let { bridge ->
-            JsBridgeInjector.injectJsBridge(state, bridge)
-            
-            // Inject Android-specific bridge connection
-            val androidScript = """
-                window.${bridge.jsBridgeName}.postMessage = function (message) {
-                    window.androidJsBridge.call(message);
-                };
-            """.trimIndent()
-            
-            JsBridgeInjector.injectPlatformBridge(state, bridge, androidScript)
-        }
+        // Fallback injection if the DOM-ready path didn't already inject (idempotent).
+        injectBridgeIfNeeded()
+    }
+
+    /**
+     * Injects the calf JS bridge (window.<jsBridgeName>) into the current document, once per
+     * document. Called both at DOMContentLoaded (so the bridge exists before onPageFinished —
+     * which may never fire) and at onPageFinished as a fallback. The bridgeInjected guard is reset
+     * in onPageStarted, so each document gets exactly one injection.
+     */
+    internal fun injectBridgeIfNeeded() {
+        if (bridgeInjected) return
+        val bridge = webViewJsBridge ?: return
+        bridgeInjected = true
+
+        JsBridgeInjector.injectJsBridge(state, bridge)
+
+        // Inject Android-specific bridge connection
+        val androidScript = """
+            window.${bridge.jsBridgeName}.postMessage = function (message) {
+                window.androidJsBridge.call(message);
+            };
+        """.trimIndent()
+
+        JsBridgeInjector.injectPlatformBridge(state, bridge, androidScript)
     }
 
     override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
