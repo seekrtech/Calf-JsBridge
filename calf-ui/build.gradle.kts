@@ -1,6 +1,5 @@
 plugins {
     id("compose.multiplatform")
-    id("module.publication")
 }
 
 kotlin {

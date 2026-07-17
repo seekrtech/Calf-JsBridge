@@ -1,22 +1,24 @@
-plugins {
-    id("io.github.gradle-nexus.publish-plugin")
-}
+import org.gradle.api.publish.PublishingExtension
 
 allprojects {
     group = "com.mohamedrejeb.calf"
-    version = System.getenv("VERSION") ?: "0.6.1"
+    version = System.getenv("VERSION") ?: "0.8.0-jsbridge"
 }
 
-nexusPublishing {
-    // Configure maven central repository
-    // https://github.com/gradle-nexus/publish-plugin#publishing-to-maven-central-via-sonatype-ossrh
-    repositories {
-        sonatype {
-            nexusUrl.set(uri("https://s01.oss.sonatype.org/service/local/"))
-            snapshotRepositoryUrl.set(uri("https://s01.oss.sonatype.org/content/repositories/snapshots/"))
-            stagingProfileId.set(System.getenv("OSSRH_STAGING_PROFILE_ID"))
-            username.set(System.getenv("OSSRH_USERNAME"))
-            password.set(System.getenv("OSSRH_PASSWORD"))
+// GitHub Packages publishing configuration for private repository
+allprojects {
+    afterEvaluate {
+        extensions.findByType<PublishingExtension>()?.apply {
+            repositories {
+                maven {
+                    name = "GitHubPackages"
+                    url = uri("https://maven.pkg.github.com/${System.getenv("GITHUB_REPOSITORY") ?: "YourUsername/YourRepositoryName"}")
+                    credentials {
+                        username = System.getenv("GITHUB_ACTOR") ?: System.getenv("GITHUB_USERNAME")
+                        password = System.getenv("GITHUB_TOKEN")
+                    }
+                }
+            }
         }
     }
 }

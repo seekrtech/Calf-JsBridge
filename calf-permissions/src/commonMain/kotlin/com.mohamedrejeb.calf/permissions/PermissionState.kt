@@ -99,6 +99,7 @@ enum class Permission {
     ReadAudio,
     FineLocation,
     CoarseLocation,
+    BackgroundLocation,
     Notification,
     RemoteNotification,
     RecordAudio,
@@ -106,5 +107,10 @@ enum class Permission {
     BluetoothScan,
     BluetoothConnect,
     BluetoothAdvertise,
-    ReadContacts
+    ReadContacts,
+    ReadCalendar,
+    WriteCalendar,
+    WifiAccessState,
+    WifiChangeState,
+    WifiNearbyDevices
 }

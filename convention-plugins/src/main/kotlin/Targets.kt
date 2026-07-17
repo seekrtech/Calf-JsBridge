@@ -17,8 +17,10 @@ fun KotlinMultiplatformExtension.applyTargets() {
 
     js().browser()
 
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmJs().browser()
+    // Commenting out wasmJs target due to serialization dependency issues
+    // and it's not needed for iOS/Android only projects
+    // @OptIn(ExperimentalWasmDsl::class)
+    // wasmJs().browser()
 
     iosX64()
     iosArm64()

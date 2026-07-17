@@ -13,6 +13,7 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
+import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Immutable
@@ -28,9 +29,37 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
+import com.mohamedrejeb.calf.ui.web.jsbridge.AndroidJsBridgeInterface
+import com.mohamedrejeb.calf.ui.web.jsbridge.DomContentLoadedInterface
+import com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector
+import com.mohamedrejeb.calf.ui.web.jsbridge.WebViewJsBridge
+import com.mohamedrejeb.calf.ui.web.request.WebRequest
+import com.mohamedrejeb.calf.ui.web.request.WebRequestInterceptResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
+
+actual typealias PlatformWebView = WebView
+
+private const val DOM_CONTENT_LOADED_SCRIPT = """
+(function () {
+  if (window.top !== window.self) return; // main frame only, parity with iOS forMainFrameOnly
+  function post() {
+    try { window.androidDomLoaded.onDomContentLoaded(); } catch (e) {}
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', post);
+  } else {
+    post();
+  }
+})();
+"""
 
 /**
  * A wrapper around the Android View WebView to provide a basic WebView composable.
@@ -61,15 +90,20 @@ import kotlinx.coroutines.withContext
 actual fun WebView(
     state: WebViewState,
     modifier: Modifier,
+    alpha: Float,
     captureBackPresses: Boolean,
     navigator: WebViewNavigator,
-    onCreated: () -> Unit,
-    onDispose: () -> Unit,
+    webViewJsBridge: WebViewJsBridge?,
+    loadContentDelay: Duration,
+    onCreated: (PlatformWebView) -> Unit,
+    onDispose: (PlatformWebView) -> Unit,
 ) {
     val client = remember { AccompanistWebViewClient() }
     val chromeClient = remember { AccompanistWebChromeClient() }
 
-    BoxWithConstraints(modifier) {
+    BoxWithConstraints(
+        modifier.alpha(alpha)
+    ) {
         // WebView changes it's layout strategy based on
         // it's layoutParams. We convert from Compose Modifier to
         // layout params here.
@@ -95,6 +129,8 @@ actual fun WebView(
             Modifier,
             captureBackPresses,
             navigator,
+            webViewJsBridge,
+            loadContentDelay,
             {
                 it.settings.standardFontFamily = "sans-serif"
                 it.settings.defaultFontSize = 16
@@ -117,8 +153,8 @@ actual fun WebView(
                 it.settings.builtInZoomControls = true
                 it.settings.displayZoomControls = false
                 it.settings.setGeolocationEnabled(true)
-                onCreated() },
-            { onDispose() },
+                onCreated(it) },
+            { onDispose(it) },
             client,
             chromeClient,
             null
@@ -158,6 +194,8 @@ internal fun WebView(
     modifier: Modifier = Modifier,
     captureBackPresses: Boolean = true,
     navigator: WebViewNavigator = rememberWebViewNavigator(),
+    webViewJsBridge: WebViewJsBridge? = null,
+    loadContentDelay: Duration = 0.milliseconds,
     onCreated: (WebView) -> Unit = {},
     onDispose: (WebView) -> Unit = {},
     client: AccompanistWebViewClient = remember { AccompanistWebViewClient() },
@@ -177,6 +215,7 @@ internal fun WebView(
 
         LaunchedEffect(wv, state) {
             snapshotFlow { state.content }.collect { content ->
+                delay(loadContentDelay)
                 when (content) {
                     is WebContent.Url -> {
                         wv.loadUrl(content.url, content.additionalHttpHeaders)
@@ -207,6 +246,7 @@ internal fun WebView(
     // parent Web composable
     client.state = state
     client.navigator = navigator
+    client.webViewJsBridge = webViewJsBridge
     chromeClient.state = state
 
     AndroidView(
@@ -220,6 +260,44 @@ internal fun WebView(
 
                 state.viewState?.let {
                     this.restoreState(it)
+                }
+
+                // Setup JavaScript bridge if provided
+                webViewJsBridge?.let { bridge ->
+                    val androidInterface = AndroidJsBridgeInterface(bridge)
+                    addJavascriptInterface(androidInterface, "androidJsBridge")
+                }
+
+                // Register the DOM-ready signal unconditionally, independent of whether
+                // a JS bridge was provided. On DOM-ready it also injects the calf JS bridge so
+                // window.<jsBridgeName> exists before onPageFinished (which may never fire).
+                addJavascriptInterface(
+                    DomContentLoadedInterface(state) { client.injectBridgeIfNeeded() },
+                    "androidDomLoaded",
+                )
+                if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+                    WebViewCompat.addDocumentStartJavaScript(this, DOM_CONTENT_LOADED_SCRIPT, setOf("*"))
+                    // Install the JS bridge at document start (mirrors the iOS WKUserScript
+                    // path) so page scripts that run before DOMContentLoaded can reach
+                    // native immediately. injectBridgeIfNeeded stays as the fallback for
+                    // WebViews without DOCUMENT_START_SCRIPT support.
+                    webViewJsBridge?.let { bridge ->
+                        // addDocumentStartJavaScript runs in EVERY matching frame (there is
+                        // no forMainFrameOnly equivalent), so gate on window.top — otherwise
+                        // cross-origin iframes would get a live bridge to native handlers.
+                        WebViewCompat.addDocumentStartJavaScript(
+                            this,
+                            """
+                            if (window.top === window.self) {
+                                ${JsBridgeInjector.documentStartBridgeScript(
+                                    jsBridgeName = bridge.jsBridgeName,
+                                    platformPostMessageBody = "window.androidJsBridge.call(message);",
+                                )}
+                            }
+                            """.trimIndent(),
+                            setOf("*"),
+                        )
+                    }
                 }
 
                 webChromeClient = chromeClient
@@ -276,10 +354,18 @@ public open class AccompanistWebViewClient : WebViewClient() {
         internal set
     public open lateinit var navigator: WebViewNavigator
         internal set
+    public open var webViewJsBridge: WebViewJsBridge? = null
+        internal set
+
+    // Guards one-per-document calf JS-bridge injection (see injectBridgeIfNeeded).
+    private var bridgeInjected: Boolean = false
 
     override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
         super.onPageStarted(view, url, favicon)
+
         state.loadingState = LoadingState.Loading(0.0f)
+        state.domContentLoaded = false
+        bridgeInjected = false
         state.errorsForCurrentRequest.clear()
         state.pageTitle = null
         state.pageIcon = null
@@ -289,7 +375,34 @@ public open class AccompanistWebViewClient : WebViewClient() {
 
     override fun onPageFinished(view: WebView, url: String?) {
         super.onPageFinished(view, url)
+
         state.loadingState = LoadingState.Finished
+
+        // Fallback injection if the DOM-ready path didn't already inject (idempotent).
+        injectBridgeIfNeeded()
+    }
+
+    /**
+     * Injects the calf JS bridge (window.<jsBridgeName>) into the current document, once per
+     * document. Called both at DOMContentLoaded (so the bridge exists before onPageFinished —
+     * which may never fire) and at onPageFinished as a fallback. The bridgeInjected guard is reset
+     * in onPageStarted, so each document gets exactly one injection.
+     */
+    internal fun injectBridgeIfNeeded() {
+        if (bridgeInjected) return
+        val bridge = webViewJsBridge ?: return
+        bridgeInjected = true
+
+        JsBridgeInjector.injectJsBridge(state, bridge)
+
+        // Inject Android-specific bridge connection
+        val androidScript = """
+            window.${bridge.jsBridgeName}.postMessage = function (message) {
+                window.androidJsBridge.call(message);
+            };
+        """.trimIndent()
+
+        JsBridgeInjector.injectPlatformBridge(state, bridge, androidScript)
     }
 
     override fun doUpdateVisitedHistory(view: WebView, url: String?, isReload: Boolean) {
@@ -299,6 +412,7 @@ public open class AccompanistWebViewClient : WebViewClient() {
         navigator.canGoForward = view.canGoForward()
     }
 
+    @RequiresApi(Build.VERSION_CODES.M)
     override fun onReceivedError(
         view: WebView,
         request: WebResourceRequest?,
@@ -307,7 +421,58 @@ public open class AccompanistWebViewClient : WebViewClient() {
         super.onReceivedError(view, request, error)
 
         if (error != null) {
-            state.errorsForCurrentRequest.add(WebViewError(request, error))
+            state.errorsForCurrentRequest.add(
+                WebViewError(
+                    code = error.errorCode,
+                    description = error.description.toString(),
+                    isFromMainFrame = request?.isForMainFrame ?: false,
+                ),
+            )
+        }
+    }
+
+    private var isRedirect = false
+
+    override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+        if (isRedirect || request == null || navigator.requestInterceptor == null) {
+            isRedirect = false
+            return super.shouldOverrideUrlLoading(view, request)
+        }
+        
+        val isRedirectRequest = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            request.isRedirect
+        } else {
+            false
+        }
+        
+        val webRequest = WebRequest(
+            url = request.url.toString(),
+            headers = request.requestHeaders?.toMutableMap() ?: mutableMapOf(),
+            isForMainFrame = request.isForMainFrame,
+            isRedirect = isRedirectRequest,
+            method = request.method ?: "GET"
+        )
+        
+        val interceptResult = navigator.requestInterceptor!!.onInterceptUrlRequest(
+            webRequest,
+            navigator
+        )
+        
+        return when (interceptResult) {
+            is WebRequestInterceptResult.Allow -> {
+                false
+            }
+            is WebRequestInterceptResult.Reject -> {
+                true
+            }
+            is WebRequestInterceptResult.Modify -> {
+                isRedirect = true
+                interceptResult.request.apply {
+                    navigator.stopLoading()
+                    navigator.loadUrl(this.url, this.headers)
+                }
+                true
+            }
         }
     }
 }
@@ -337,6 +502,7 @@ public open class AccompanistWebChromeClient : WebChromeClient() {
     override fun onProgressChanged(view: WebView, newProgress: Int) {
         super.onProgressChanged(view, newProgress)
         if (state.loadingState is LoadingState.Finished) return
+
         state.loadingState = LoadingState.Loading(newProgress / 100.0f)
     }
 }
@@ -363,10 +529,25 @@ actual class WebViewState actual constructor(webContent: WebContent) {
         internal set
 
     /**
+     * Whether the DOM content of the currently loaded document has finished loading.
+     * Sticky per document: reset to `false` at navigation start, set to `true` when the
+     * DOM-ready sentinel arrives.
+     */
+    actual var domContentLoaded: Boolean by mutableStateOf(false)
+        internal set
+
+    /**
      * Whether the webview is currently loading data in its main frame
      */
     actual val isLoading: Boolean
         get() = loadingState !is LoadingState.Finished
+
+    /**
+     * A list for errors captured in the last load. Reset when a new page is loaded.
+     * Errors could be from any resource (iframe, image, etc.), not just for the main page.
+     * To filter for only main frame errors, use [WebViewError.isFromMainFrame].
+     */
+    actual val errorsForCurrentRequest: SnapshotStateList<WebViewError> = mutableStateListOf()
 
     /**
      * The title received from the loaded content of the current page
@@ -394,13 +575,6 @@ actual class WebViewState actual constructor(webContent: WebContent) {
      */
     public var pageIcon: Bitmap? by mutableStateOf(null)
         internal set
-
-    /**
-     * A list for errors captured in the last load. Reset when a new page is loaded.
-     * Errors could be from any resource (iframe, image, etc.), not just for the main page.
-     * For more fine grained control use the OnError callback of the WebView.
-     */
-    val errorsForCurrentRequest: SnapshotStateList<WebViewError> = mutableStateListOf()
 
     /**
      * The saved view state from when the view was destroyed last. To restore state,
@@ -435,26 +609,11 @@ internal suspend fun WebViewNavigator.handleNavigationEvents(
             )
 
             is WebViewNavigator.NavigationEvent.LoadUrl -> {
-                loadUrl(event.url, event.additionalHttpHeaders)
+                webView.loadUrl(event.url, event.additionalHttpHeaders)
             }
         }
     }
 }
-
-/**
- * A wrapper class to hold errors from the WebView.
- */
-@Immutable
-public data class WebViewError(
-    /**
-     * The request the error came from.
-     */
-    val request: WebResourceRequest?,
-    /**
-     * The error that was reported.
-     */
-    val error: WebResourceError
-)
 
 actual val WebStateSaver: Saver<WebViewState, Any> = run {
     val pageTitleKey = "pagetitle"

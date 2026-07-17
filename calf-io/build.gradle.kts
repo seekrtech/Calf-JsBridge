@@ -1,6 +1,5 @@
 plugins {
     id("kotlin.multiplatform")
-    id("module.publication")
 }
 
 kotlin {
@@ -10,5 +9,9 @@ kotlin {
 
     sourceSets.androidMain.dependencies {
         implementation(libs.documentfile)
+    }
+
+    sourceSets.wasmJsMain.dependencies {
+        implementation(libs.kotlinx.browser)
     }
 }
