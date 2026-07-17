@@ -181,6 +181,21 @@ actual fun WebView(
                 webViewJsBridge?.let { bridge ->
                     val iosHandler = com.mohamedrejeb.calf.ui.web.jsbridge.IOSJsBridgeHandler(bridge)
                     configuration.userContentController.addScriptMessageHandler(iosHandler, "iosJsBridge")
+                    // Install the JS bridge at document start so page scripts that run
+                    // before DOMContentLoaded (or on documents whose DOMContentLoaded /
+                    // didFinishNavigation never fire) can reach native immediately. The
+                    // evaluateJavaScript-based paths in injectBridgeIfNeeded stay as
+                    // idempotent fallbacks.
+                    configuration.userContentController.addUserScript(
+                        WKUserScript(
+                            source = com.mohamedrejeb.calf.ui.web.jsbridge.JsBridgeInjector.documentStartBridgeScript(
+                                jsBridgeName = bridge.jsBridgeName,
+                                platformPostMessageBody = "window.webkit.messageHandlers.iosJsBridge.postMessage(message);",
+                            ),
+                            injectionTime = WKUserScriptInjectionTime.WKUserScriptInjectionTimeAtDocumentStart,
+                            forMainFrameOnly = true,
+                        ),
+                    )
                     bridge.webViewState = state
                     state.webViewJsBridge = bridge
                 }

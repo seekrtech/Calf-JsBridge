@@ -277,6 +277,27 @@ internal fun WebView(
                 )
                 if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
                     WebViewCompat.addDocumentStartJavaScript(this, DOM_CONTENT_LOADED_SCRIPT, setOf("*"))
+                    // Install the JS bridge at document start (mirrors the iOS WKUserScript
+                    // path) so page scripts that run before DOMContentLoaded can reach
+                    // native immediately. injectBridgeIfNeeded stays as the fallback for
+                    // WebViews without DOCUMENT_START_SCRIPT support.
+                    webViewJsBridge?.let { bridge ->
+                        // addDocumentStartJavaScript runs in EVERY matching frame (there is
+                        // no forMainFrameOnly equivalent), so gate on window.top — otherwise
+                        // cross-origin iframes would get a live bridge to native handlers.
+                        WebViewCompat.addDocumentStartJavaScript(
+                            this,
+                            """
+                            if (window.top === window.self) {
+                                ${JsBridgeInjector.documentStartBridgeScript(
+                                    jsBridgeName = bridge.jsBridgeName,
+                                    platformPostMessageBody = "window.androidJsBridge.call(message);",
+                                )}
+                            }
+                            """.trimIndent(),
+                            setOf("*"),
+                        )
+                    }
                 }
 
                 webChromeClient = chromeClient

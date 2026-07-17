@@ -6,14 +6,17 @@ import com.mohamedrejeb.calf.ui.web.WebViewState
  * Helper class for injecting JavaScript bridge code into a WebView
  */
 object JsBridgeInjector {
-    
+
     /**
-     * Injects the JavaScript bridge code into the WebView
+     * The script that installs `window.<jsBridgeName>` (callNative + callback plumbing).
+     *
+     * Idempotent: the first installation wins, so re-running it (document-start user
+     * script followed by the DOM-ready / page-finished fallback paths) never replaces
+     * an existing bridge object — replacing it would orphan callbacks page code has
+     * already registered.
      */
-    fun injectJsBridge(webViewState: WebViewState, webViewJsBridge: WebViewJsBridge) {
-        val jsBridgeName = webViewJsBridge.jsBridgeName
-        
-        val initJs = """
+    fun bridgeInitScript(jsBridgeName: String): String = """
+        if (!window.$jsBridgeName) {
             window.$jsBridgeName = {
                 callbacks: {},
                 callbackId: 0,
@@ -38,18 +41,41 @@ object JsBridgeInjector {
                     }
                 }
             };
-        """.trimIndent()
-        
-        webViewState.evaluateJavascript(initJs)
-        
+        }
+    """.trimIndent()
+
+    /**
+     * Complete bridge script — init plus the platform `postMessage` wiring — suitable
+     * for document-start installation (WKUserScript / addDocumentStartJavaScript) so
+     * page scripts that run before DOMContentLoaded can already reach native.
+     *
+     * @param platformPostMessageBody JS statement(s) forwarding `message` to the
+     * platform message handler, e.g.
+     * `window.webkit.messageHandlers.iosJsBridge.postMessage(message);`
+     */
+    fun documentStartBridgeScript(jsBridgeName: String, platformPostMessageBody: String): String = """
+        ${bridgeInitScript(jsBridgeName)}
+        if (!window.$jsBridgeName.postMessage) {
+            window.$jsBridgeName.postMessage = function (message) {
+                $platformPostMessageBody
+            };
+        }
+    """.trimIndent()
+
+    /**
+     * Injects the JavaScript bridge code into the WebView
+     */
+    fun injectJsBridge(webViewState: WebViewState, webViewJsBridge: WebViewJsBridge) {
+        webViewState.evaluateJavascript(bridgeInitScript(webViewJsBridge.jsBridgeName))
+
         // Store reference for callbacks
         webViewJsBridge.webViewState = webViewState
     }
-    
+
     /**
      * Injects platform-specific bridge implementation
      */
     fun injectPlatformBridge(webViewState: WebViewState, webViewJsBridge: WebViewJsBridge, platformScript: String) {
         webViewState.evaluateJavascript(platformScript)
     }
-} 
+}
